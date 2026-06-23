@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE module PUBLIC
+    "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+    "https://checkstyle.org/dtds/configuration_1_3.dtd">
+<!--
+  Snapdragon shared Checkstyle config (Checkstyle 10.x).
+
+  CURATED, not kitchen-sink. Wires ONLY the convention items Checkstyle owns:
+
+    F. private field visibility (OBJ01-J)      -> VisibilityModifier
+    G. final / utility classes                 -> FinalClass,
+                                                  HideUtilityClassConstructor,
+                                                  MutableException
+    H. reactive readability (lambda length)    -> LambdaBodyLength
+
+  We deliberately do NOT enable the giant default Sun/Google check sets — only
+  these four TreeWalker checks plus the suppression-filter plumbing. Everything
+  else in the convention standard belongs to PMD (A/B) or SpotBugs+FindSecBugs
+  (D/E).
+
+  H NOTE: there is no reliable, low-noise static check for "this lambda could be
+  a method reference" or "this lambda is too deeply nested" (Checkstyle has no
+  such rule; the closest, SonarQube S1612, needs a Sonar server). So H here is
+  the size guardrail ONLY — LambdaBodyLength flags multi-statement / oversized
+  lambdas that the standard says to extract to a named ::helper. The
+  lambda->method-ref and nesting half of H stays an agent-pass convention, by
+  design, so we don't add a noisy rule that flags every lambda.
+
+  ROLLOUT: run WARN-FIRST by snapdragon-parent
+  (maven-checkstyle-plugin failOnViolation=false), so violations are reported,
+  not fatal. The severity is "warning" so even a future failOnViolation=true
+  flip would not break the build unless the severity is also raised — see the
+  metapom for the documented flip path.
+
+  Distributed as a classpath resource inside the snapdragon-build-config jar and
+  referenced via configLocation=snapdragon/checkstyle.xml (the plugin resolves
+  it from its own classpath when the artifact is a plugin <dependency>).
+-->
+<module name="Checker">
+  <property name="severity" value="warning"/>
+  <property name="charset" value="UTF-8"/>
+  <!-- Only analyse Java source files. -->
+  <property name="fileExtensions" value="java"/>
+
+  <!-- Honour // CHECKSTYLE:OFF / ON and @SuppressWarnings("checkstyle:...") so a
+       deliberate, reviewed framework exception can be annotated in-code rather
+       than forcing a rule weaken for everyone. -->
+  <module name="SuppressWarningsFilter"/>
+
+  <module name="TreeWalker">
+
+    <!-- Enables @SuppressWarnings("checkstyle:visibilitymodifier") style local
+         opt-outs, consumed by the SuppressWarningsFilter above. -->
+    <module name="SuppressWarningsHolder"/>
+
+    <!-- F. Field visibility (CERT OBJ01-J): mutable instance fields must be
+         private. Public/package/protected immutable CONSTANTS are allowed so we
+         do not flag the (correct) `public static final` and `public final`
+         patterns the codebase already uses; only mutable non-private state is
+         reported. -->
+    <module name="VisibilityModifier">
+      <property name="allowPublicFinalFields" value="true"/>
+      <property name="allowPublicImmutableFields" value="true"/>
+      <!-- JUnit 5 / Spring test fixtures and a handful of framework base classes
+           legitimately expose annotated fields; allow the common ones so the
+           signal stays on genuine encapsulation leaks. -->
+      <property name="ignoreAnnotationCanonicalNames"
+                value="org.junit.jupiter.api.io.TempDir,
+                       org.junit.jupiter.api.extension.RegisterExtension,
+                       org.mockito.Mock,
+                       org.mockito.InjectMocks,
+                       org.springframework.beans.factory.annotation.Autowired"/>
+    </module>
+
+    <!-- G. A class with only private constructors must be declared final (it
+         cannot be subclassed anyway; declaring it final makes the intent
+         explicit and lets the compiler help). -->
+    <module name="FinalClass"/>
+
+    <!-- G. A utility class (only static members) must hide its implicit public
+         constructor with a private one, so it can never be instantiated. -->
+    <module name="HideUtilityClassConstructor"/>
+
+    <!-- G. Exception classes should be immutable: no non-final fields. A mutable
+         exception can have its state changed after construction, which is a
+         readability and correctness hazard. -->
+    <module name="MutableException"/>
+
+    <!-- H. Reactive readability size guardrail: a lambda body longer than this
+         many lines is the multi-statement / oversized lambda the standard says
+         to extract into a named ::helper. Kept generous (10) so ordinary 1-3
+         line reactive steps are NOT flagged — only genuinely large bodies. -->
+    <module name="LambdaBodyLength">
+      <property name="max" value="10"/>
+    </module>
+
+  </module>
+</module>

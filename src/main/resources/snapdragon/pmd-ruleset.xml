@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Snapdragon shared PMD ruleset (PMD 7.x).
+
+  CURATED, not kitchen-sink. This ruleset wires ONLY the two secure/clean-Java
+  conventions PMD enforces reliably and without noise:
+
+    A. private static final for constants  -> FinalFieldCouldBeStatic
+    B. final for write-once fields          -> ImmutableField
+
+  Everything else in the convention standard is owned by a different tool that
+  expresses it more precisely (Checkstyle for visibility/utility-class/lambda
+  length; SpotBugs+FindSecBugs for rep-exposure and mutable statics), so we do
+  NOT pull the whole PMD category in here — that would drown the two signals we
+  actually want in hundreds of style opinions.
+
+  ROLLOUT: this ruleset is run WARN-FIRST by snapdragon-parent
+  (maven-pmd-plugin failOnViolation=false), so violations are reported, not
+  fatal. See snapdragon-parent/pom.xml for the one-line flip to fail-mode.
+
+  Distributed as a classpath resource inside the snapdragon-build-config jar and
+  referenced from the plugin via <rulesets>classpath:/snapdragon/pmd-ruleset.xml</rulesets>.
+-->
+<ruleset name="snapdragon-conventions"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+
+  <description>
+    Snapdragon secure/clean-Java conventions enforced by PMD: constants should be
+    static (A) and write-once fields should be final (B). Curated to exactly two
+    rules to keep the signal high. Warn-first via the metapom.
+  </description>
+
+  <!-- A. static-final constants. A private field that is only ever assigned a
+       compile-time constant can (and per the standard, should) be static final:
+       Logger, precompiled Pattern, Duration, literal strings/numbers, etc.
+       (PMD 7: this rule lives in the design category.) -->
+  <rule ref="category/java/design.xml/FinalFieldCouldBeStatic"/>
+
+  <!-- B. final for write-once fields. A private field assigned exactly once
+       (constructor / inline) and never reassigned should be marked final:
+       injected dependencies, config, derived values. -->
+  <rule ref="category/java/design.xml/ImmutableField"/>
+
+</ruleset>

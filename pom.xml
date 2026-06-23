@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>systems.snapdragon</groupId>
+  <artifactId>snapdragon-build-config</artifactId>
+  <version>0.1.0</version>
+  <packaging>jar</packaging>
+  <name>snapdragon-build-config</name>
+  <description>Shared static-analysis rulesets for the Snapdragon ecosystem: a tiny
+    resource-only jar carrying the curated PMD ruleset, Checkstyle config and SpotBugs
+    include/exclude filters that enforce the org's secure/clean-Java + reactive-readability
+    conventions. Referenced by snapdragon-parent on each analysis plugin's own classpath
+    (classpath:/snapdragon/*.xml), so every Java repo inherits ONE audited ruleset instead
+    of copying XML per repo. Standalone (no Spring/parent) so a ruleset tweak never forces
+    a metapom or runtime-library version bump.</description>
+
+  <properties>
+    <maven.compiler.release>21</maven.compiler.release>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+  </properties>
+
+  <!--
+    No <dependencies>: this artifact ships only XML resources under
+    src/main/resources/snapdragon/. The PMD / Checkstyle / SpotBugs plugins read
+    those resources from THIS jar when snapdragon-parent adds it to each plugin's
+    <dependencies> block (so they resolve classpath:/snapdragon/<file>.xml from
+    the plugin classloader, independent of the project's own dependencies).
+  -->
+
+  <build>
+    <plugins>
+      <!-- Reproducible, deterministic jar (no timestamp churn) — this artifact is a
+           build input for the whole org, so a stable hash is desirable. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+      </plugin>
+    </plugins>
+  </build>
+
+  <!-- Publish to the GitLab project's Maven Package Registry — mirrors
+       snapdragon-parent's distributionManagement. CI_API_V4_URL / CI_PROJECT_ID are
+       provided by GitLab CI; the CI_JOB_TOKEN credential lives in settings.xml
+       (consumed by `mvn deploy -s settings.xml`), never here. NO secret committed. -->
+  <distributionManagement>
+    <repository>
+      <id>gitlab-maven</id>
+      <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+    </repository>
+    <snapshotRepository>
+      <id>gitlab-maven</id>
+      <url>${env.CI_API_V4_URL}/projects/${env.CI_PROJECT_ID}/packages/maven</url>
+    </snapshotRepository>
+  </distributionManagement>
+</project>

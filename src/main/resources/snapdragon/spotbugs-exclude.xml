@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Snapdragon shared SpotBugs EXCLUDE filter (the "baseline").
+
+  This suppresses the rep-exposure / mutable-static findings that are EXPECTED
+  by-design in framework and persistence code, so the warn-first report keeps the
+  signal on real, fixable application findings rather than drowning in entity and
+  generated-code patterns. Keep this list SMALL and justified; prefer fixing code
+  over growing the baseline.
+
+  Referenced from snapdragon-parent via spotbugs-maven-plugin
+  <excludeFilterFile>snapdragon/spotbugs-exclude.xml</excludeFilterFile>
+  (resolved from the plugin classpath, since snapdragon-build-config is a plugin
+  <dependency>).
+-->
+<FindBugsFilter>
+
+  <!-- Generated / test code: never analyse for these conventions. -->
+  <Match>
+    <Source name="~.*[\\/]generated-sources[\\/].*"/>
+  </Match>
+  <Match>
+    <Class name="~.*Test"/>
+  </Match>
+  <Match>
+    <Class name="~.*Tests"/>
+  </Match>
+  <Match>
+    <Class name="~.*IT"/>
+  </Match>
+
+  <!-- R2DBC / JPA entity & DTO records and POJOs frequently carry array/date/
+       collection fields whose accessors return the field directly because the
+       framework (de)serialises them; flagging EI_EXPOSE_REP on every such
+       getter/setter is noise. Real keys/tokens/byte[] exposure in *service*
+       classes is NOT excluded and still reports. Scope this narrowly to the
+       entity/dto/model packages. -->
+  <Match>
+    <Package name="~.*\.(entity|entities|dto|model|domain\.model)(\..*)?"/>
+    <Or>
+      <Bug pattern="EI_EXPOSE_REP"/>
+      <Bug pattern="EI_EXPOSE_REP2"/>
+    </Or>
+  </Match>
+
+  <!-- Lombok / record-style value carriers occasionally trip EI_EXPOSE_REP2 on
+       canonical constructors; once the codebase converts these to defensive
+       copies the line can be removed. Intentionally NOT a blanket suppression. -->
+
+</FindBugsFilter>

@@ -1,0 +1,40 @@
+# snapdragon-build-config — build the rulesets jar and publish it to the GitLab
+# Maven Package Registry.
+#
+# This artifact carries only the shared PMD/Checkstyle/SpotBugs ruleset XMLs that
+# snapdragon-parent references on each analysis plugin's classpath. It compiles no
+# Java; the pipeline just packages the resources and (on the default branch / a tag)
+# deploys the jar so the metapom + every Java repo can resolve it.
+
+stages:
+  - build
+  - deploy
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=$CI_PROJECT_DIR/.m2/repository"
+  MAVEN_CLI_OPTS: "-B -ntp -s settings.xml"
+
+cache:
+  key: "$CI_COMMIT_REF_SLUG"
+  paths:
+    - .m2/repository
+
+build:jar:
+  stage: build
+  image: maven:3.9-eclipse-temurin-21
+  script:
+    - mvn $MAVEN_CLI_OPTS package
+  artifacts:
+    paths:
+      - target/*.jar
+    expire_in: 1 week
+
+deploy:maven:
+  stage: deploy
+  image: maven:3.9-eclipse-temurin-21
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+  script:
+    # CI_JOB_TOKEN (read-only, job-scoped) is read from settings.xml's Job-Token header.
+    - mvn $MAVEN_CLI_OPTS deploy
