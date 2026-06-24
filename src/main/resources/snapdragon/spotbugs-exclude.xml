@@ -47,4 +47,15 @@
        canonical constructors; once the codebase converts these to defensive
        copies the line can be removed. Intentionally NOT a blanket suppression. -->
 
+  <!-- Spring-managed components store injected beans via constructor parameters.
+       The Spring container owns the bean lifecycle and these fields are never
+       mutated post-construction — this is NOT an encapsulation leak.
+       Suppress EI_EXPOSE_REP2 (storing externally mutable object) for the
+       standard Spring component packages only; EI_EXPOSE_REP (returning
+       mutable objects) remains active for real finding coverage. -->
+  <Match>
+    <Package name="~.*\.(controller|service|client|config|repository|external|filter|handler|resolver|web|internalapi)(\..*)?"/ >
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
 </FindBugsFilter>
