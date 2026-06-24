@@ -26,18 +26,15 @@
   lambda->method-ref and nesting half of H stays an agent-pass convention, by
   design, so we don't add a noisy rule that flags every lambda.
 
-  ROLLOUT: run WARN-FIRST by snapdragon-parent
-  (maven-checkstyle-plugin failOnViolation=false), so violations are reported,
-  not fatal. The severity is "warning" so even a future failOnViolation=true
-  flip would not break the build unless the severity is also raised — see the
-  metapom for the documented flip path.
+  FAIL MODE: severity=error so failOnViolation=true in snapdragon-parent triggers on any violation.
+  Fleet verified clean (0 violations) before this flip.
 
   Distributed as a classpath resource inside the snapdragon-build-config jar and
   referenced via configLocation=snapdragon/checkstyle.xml (the plugin resolves
   it from its own classpath when the artifact is a plugin <dependency>).
 -->
 <module name="Checker">
-  <property name="severity" value="warning"/>
+  <property name="severity" value="error"/>
   <property name="charset" value="UTF-8"/>
   <!-- Only analyse Java source files. -->
   <property name="fileExtensions" value="java"/>
