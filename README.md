@@ -53,7 +53,7 @@ standard. Each item maps to the most precise tool:
 stay agent-pass conventions — we deliberately do not add a rule that flags every
 lambda or every collection field.
 
-## Rollout: warn-first
+## Rollout: partial fail-mode
 
 Checkstyle now runs in **fail-mode** (severity=error; failOnViolation=true) — the fleet was verified clean before this flip. PMD and SpotBugs still run in **warn-first** mode (report only). See `snapdragon-parent/pom.xml` for the documented one-line flip to fail-mode for PMD/SpotBugs once the fleet is clean.
 
