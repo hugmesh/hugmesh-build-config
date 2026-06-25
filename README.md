@@ -6,7 +6,7 @@ static-analysis rulesets:
 ```
 groupId:    systems.snapdragon
 artifactId: snapdragon-build-config
-version:    0.1.0
+version:    0.3.0
 packaging:  jar
 ```
 
@@ -18,7 +18,7 @@ It contains no Java — only ruleset XML under
 | `pmd-ruleset.xml`     | PMD       | **A** `FinalFieldCouldBeStatic` (constants → `static final`), **B** `ImmutableField` (write-once fields → `final`) |
 | `checkstyle.xml`      | Checkstyle | **F** `VisibilityModifier` (private fields), **G** `FinalClass` + `HideUtilityClassConstructor` + `MutableException` (final/utility/immutable-exception classes), **H** `LambdaBodyLength` (oversized lambda guardrail) |
 | `spotbugs-include.xml`| SpotBugs + FindSecBugs | **D** `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`/`MS_EXPOSE_REP`/`MS_MUTABLE_*` (defensive copies / no rep exposure), **E** `MS_SHOULD_BE_FINAL` (no mutable static) |
-| `spotbugs-exclude.xml`| SpotBugs | The known-pattern **baseline** (entity/dto records, generated + test code) so the warn-first report keeps signal high |
+| `spotbugs-exclude.xml`| SpotBugs | The known-pattern **baseline**: entity/dto/model packages (EI_EXPOSE_REP/EI_EXPOSE_REP2), generated sources, and test classes. Also suppresses EI_EXPOSE_REP2 (but NOT EI_EXPOSE_REP) for Spring-managed component packages (controller/service/client/config/repository/etc.) where constructor-injected beans are not an encapsulation leak. |
 
 ## Why a separate artifact (the distribution mechanism)
 
@@ -55,9 +55,7 @@ lambda or every collection field.
 
 ## Rollout: warn-first
 
-The metapom runs every analysis plugin in **warn-first** mode (report, do not fail
-the build). See `snapdragon-parent/pom.xml` for the documented one-line flip to
-fail-mode once the fleet is clean.
+Checkstyle now runs in **fail-mode** (severity=error; failOnViolation=true) — the fleet was verified clean before this flip. PMD and SpotBugs still run in **warn-first** mode (report only). See `snapdragon-parent/pom.xml` for the documented one-line flip to fail-mode for PMD/SpotBugs once the fleet is clean.
 
 ## Publishing
 
