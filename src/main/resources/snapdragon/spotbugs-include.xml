@@ -12,10 +12,14 @@
          MS_EXPOSE_REP    - a static method exposes a mutable static
          MS_MUTABLE_ARRAY      - a mutable static array (e.g. String[] config)
          MS_MUTABLE_COLLECTION - a mutable static collection
+         MS_MUTABLE_COLLECTION_PKGPROTECT - a mutable static collection that
+                                  should be package-protected/final
          MS_PKGPROTECT         - a static field that should be package-protected/final
 
     E. no mutable static state
          MS_SHOULD_BE_FINAL    - a static field that is never reassigned
+         MS_CANNOT_BE_FINAL    - a static field that could be final but is
+                                  package-visible/reassigned elsewhere in package
 
   FindSecBugs reuses the same EI_EXPOSE_REP* / MS_* pattern names for its
   security-flavoured detectors (keys, tokens, byte[]), so listing the pattern

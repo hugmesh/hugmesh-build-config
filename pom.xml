@@ -13,7 +13,7 @@
     resource-only jar carrying the curated PMD ruleset, Checkstyle config and SpotBugs
     include/exclude filters that enforce the org's secure/clean-Java + reactive-readability
     conventions. Referenced by snapdragon-parent on each analysis plugin's own classpath
-    (classpath:/snapdragon/*.xml), so every Java repo inherits ONE audited ruleset instead
+    (bare path snapdragon/*.xml, no "classpath:" prefix), so every Java repo inherits ONE audited ruleset instead
     of copying XML per repo. Standalone (no Spring/parent) so a ruleset tweak never forces
     a metapom or runtime-library version bump.</description>
 
@@ -21,23 +21,34 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <!-- Maven Reproducible-Builds normalized timestamp: fixes jar entry
+         timestamps (and this property, when set) to a stable value instead of
+         real build time, so identical source produces an identical jar hash.
+         Bump this to the commit/release date on tagged releases. -->
+    <project.build.outputTimestamp>2026-01-01T00:00:00Z</project.build.outputTimestamp>
   </properties>
 
   <!--
     No <dependencies>: this artifact ships only XML resources under
     src/main/resources/snapdragon/. The PMD / Checkstyle / SpotBugs plugins read
     those resources from THIS jar when snapdragon-parent adds it to each plugin's
-    <dependencies> block (so they resolve classpath:/snapdragon/<file>.xml from
-    the plugin classloader, independent of the project's own dependencies).
+    <dependencies> block (so they resolve the bare path snapdragon/<file>.xml from
+    the plugin classloader, independent of the project's own dependencies; a
+    "classpath:" prefix causes these plugins to fail with "Could not find
+    resource" — see the description above and README.md).
   -->
 
   <build>
     <plugins>
       <!-- Reproducible, deterministic jar (no timestamp churn) — this artifact is a
-           build input for the whole org, so a stable hash is desirable. -->
+           build input for the whole org, so a stable hash is desirable. Determinism
+           comes from the project.build.outputTimestamp property above (normalizes
+           jar entry timestamps); the plugin version is pinned per Maven's own
+           "missing plugin version threatens build stability" guidance. -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
+        <version>3.5.0</version>
       </plugin>
     </plugins>
   </build>

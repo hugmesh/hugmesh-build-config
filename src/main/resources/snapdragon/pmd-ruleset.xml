@@ -19,7 +19,9 @@
   fatal. See snapdragon-parent/pom.xml for the one-line flip to fail-mode.
 
   Distributed as a classpath resource inside the snapdragon-build-config jar and
-  referenced from the plugin via <rulesets>classpath:/snapdragon/pmd-ruleset.xml</rulesets>.
+  referenced from the plugin via <rulesets>snapdragon/pmd-ruleset.xml</rulesets>
+  (no "classpath:" prefix — the plugin resolves this bare path from its own
+  classpath once snapdragon-build-config is added as a plugin <dependency>).
 -->
 <ruleset name="snapdragon-conventions"
          xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"

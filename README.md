@@ -22,10 +22,12 @@ It contains no Java — only ruleset XML under
 
 ## Why a separate artifact (the distribution mechanism)
 
-Static-analysis plugins resolve a `classpath:` ruleset from **their own plugin
+Static-analysis plugins resolve a ruleset from **their own plugin
 classpath**, not the project's compile classpath. So `snapdragon-parent` adds
 this jar to each analysis plugin's `<dependencies>` and points the plugin at
-`classpath:/snapdragon/<file>.xml`. Because the parent inherits into every Java
+the bare classpath path `snapdragon/<file>.xml` (no `classpath:` prefix — that
+prefix causes `maven-pmd-plugin`/`spotbugs-maven-plugin` to fail with
+"Could not find resource"). Because the parent inherits into every Java
 repo, every repo gets the same audited rulesets automatically — **no per-repo XML
 copy**.
 
@@ -64,3 +66,10 @@ Maven Package Registry via `mvn deploy -s settings.xml`, authenticated with the
 GitLab-injected `CI_JOB_TOKEN` — **no secret committed**. There is no GitHub
 Actions pipeline; CI is GitLab. For local dev, `mvn install` writes the jar to
 `~/.m2` so sibling repos resolve it offline.
+
+## Known Gaps / TODO
+
+- None open. The one doc/config gap found this pass (a stale `pom.xml` comment
+  above `<build>` that still said plugins resolve `classpath:/snapdragon/<file>.xml`,
+  contradicting the already-corrected bare-path wording in the `<description>`
+  above it and in this README) has been fixed in `pom.xml`.

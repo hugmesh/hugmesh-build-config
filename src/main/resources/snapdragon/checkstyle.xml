@@ -26,8 +26,12 @@
   lambda->method-ref and nesting half of H stays an agent-pass convention, by
   design, so we don't add a noisy rule that flags every lambda.
 
-  FAIL MODE: severity=error so failOnViolation=true in snapdragon-parent triggers on any violation.
-  Fleet verified clean (0 violations) before this flip.
+  ROLLOUT: this ruleset is run WARN-FIRST by snapdragon-parent (Checkstyle
+  failOnViolation=false), so violations are reported, not fatal, same as
+  pmd-ruleset.xml and spotbugs-include.xml. severity=error is set below so
+  that the single documented flip to failOnViolation=true in snapdragon-parent
+  is enough to make violations fatal once the fleet is verified clean — it is
+  not itself a signal that fail-mode is active yet.
 
   Distributed as a classpath resource inside the snapdragon-build-config jar and
   referenced via configLocation=snapdragon/checkstyle.xml (the plugin resolves

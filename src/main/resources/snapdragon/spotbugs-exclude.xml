@@ -54,7 +54,7 @@
        standard Spring component packages only; EI_EXPOSE_REP (returning
        mutable objects) remains active for real finding coverage. -->
   <Match>
-    <Package name="~.*\.(controller|service|client|config|repository|external|filter|handler|resolver|web|internalapi)(\..*)?"/ >
+    <Package name="~.*\.(controller|service|client|config|repository|external|filter|handler|resolver|web|internalapi)(\..*)?"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
 
