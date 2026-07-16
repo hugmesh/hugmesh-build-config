@@ -3,10 +3,10 @@
   Snapdragon shared SpotBugs EXCLUDE filter (the "baseline").
 
   This suppresses the rep-exposure / mutable-static findings that are EXPECTED
-  by-design in framework and persistence code, so the warn-first report keeps the
-  signal on real, fixable application findings rather than drowning in entity and
-  generated-code patterns. Keep this list SMALL and justified; prefer fixing code
-  over growing the baseline.
+  by-design in framework and persistence code, so the (now fail-mode) report
+  keeps the signal on real, fixable application findings rather than drowning in
+  entity and generated-code patterns. Keep this list SMALL and justified; prefer
+  fixing code over growing the baseline.
 
   Referenced from snapdragon-parent via spotbugs-maven-plugin
   <excludeFilterFile>snapdragon/spotbugs-exclude.xml</excludeFilterFile>

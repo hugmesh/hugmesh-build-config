@@ -14,9 +14,9 @@
   NOT pull the whole PMD category in here — that would drown the two signals we
   actually want in hundreds of style opinions.
 
-  ROLLOUT: this ruleset is run WARN-FIRST by snapdragon-parent
-  (maven-pmd-plugin failOnViolation=false), so violations are reported, not
-  fatal. See snapdragon-parent/pom.xml for the one-line flip to fail-mode.
+  ROLLOUT: this ruleset now runs in FAIL MODE via snapdragon-parent
+  (maven-pmd-plugin pmd:check, failOnViolation=true) — the fleet was verified
+  clean before the flip. See snapdragon-parent/pom.xml.
 
   Distributed as a classpath resource inside the snapdragon-build-config jar and
   referenced from the plugin via <rulesets>snapdragon/pmd-ruleset.xml</rulesets>
@@ -31,7 +31,7 @@
   <description>
     Snapdragon secure/clean-Java conventions enforced by PMD: constants should be
     static (A) and write-once fields should be final (B). Curated to exactly two
-    rules to keep the signal high. Warn-first via the metapom.
+    rules to keep the signal high. Fail-mode via the metapom.
   </description>
 
   <!-- A. static-final constants. A private field that is only ever assigned a

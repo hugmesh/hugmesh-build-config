@@ -30,10 +30,11 @@
   exactly the D/E signal and nothing else — no NPE/dead-store/i18n noise drowning
   the convention findings on first rollout.
 
-  ROLLOUT: SpotBugs runs WARN-FIRST via snapdragon-parent
-  (spotbugs-maven-plugin failOnError=false + the spotbugs:spotbugs reporting
-  goal, NOT spotbugs:check). The known-pattern baseline lives in
-  spotbugs-exclude.xml.
+  ROLLOUT: SpotBugs now runs in FAIL MODE via snapdragon-parent
+  (spotbugs-maven-plugin spotbugs:check, failOnViolation=true; failOnError=false
+  is kept separately so a SpotBugs *internal* error, e.g. a missing class,
+  never fails the build spuriously — that is independent of violation
+  fail-mode). The known-pattern baseline lives in spotbugs-exclude.xml.
 -->
 <FindBugsFilter>
 
