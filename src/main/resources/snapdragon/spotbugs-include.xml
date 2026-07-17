@@ -2,41 +2,73 @@
 <!--
   Snapdragon shared SpotBugs INCLUDE filter.
 
-  CURATED, not kitchen-sink. SpotBugs ships hundreds of bug patterns; this filter
-  narrows analysis reporting to ONLY the patterns that enforce the two
-  convention items SpotBugs (+ FindSecBugs) owns:
+  CURATED, not kitchen-sink. SpotBugs ships hundreds of bug patterns; an INCLUDE
+  filter means ONLY the patterns named here are ever reported — anything not
+  listed is invisible, no matter what the detectors find. Adding a pattern here is
+  how a check gets turned ON.
 
-    D. defensive copies / no representation exposure (CERT OBJ04/05-J)
-         EI_EXPOSE_REP    - returning a reference to a mutable internal field
-         EI_EXPOSE_REP2   - storing an externally-supplied mutable object directly
-         MS_EXPOSE_REP    - a static method exposes a mutable static
-         MS_MUTABLE_ARRAY      - a mutable static array (e.g. String[] config)
-         MS_MUTABLE_COLLECTION - a mutable static collection
-         MS_MUTABLE_COLLECTION_PKGPROTECT - a mutable static collection that
-                                  should be package-protected/final
-         MS_PKGPROTECT         - a static field that should be package-protected/final
+  It covers two things:
 
-    E. no mutable static state
-         MS_SHOULD_BE_FINAL    - a static field that is never reassigned
-         MS_CANNOT_BE_FINAL    - a static field that could be final but is
-                                  package-visible/reassigned elsewhere in package
+  (1) The org's own convention items D/E (representation exposure + mutable static
+      state), owned by SpotBugs core.
+  (2) The FindSecBugs security patterns.
 
-  FindSecBugs reuses the same EI_EXPOSE_REP* / MS_* pattern names for its
-  security-flavoured detectors (keys, tokens, byte[]), so listing the pattern
-  names here is enough to surface both the core and FindSecBugs findings for
-  these conventions.
+  ============================================================================
+  NOTE ON FINDSECBUGS PATTERN NAMES — the previous version of this comment was
+  WRONG in a way that silently disabled all security scanning.
+  ============================================================================
+  It claimed FindSecBugs "reuses the same EI_EXPOSE_REP* / MS_* pattern names for
+  its security-flavoured detectors (keys, tokens, byte[]), so listing the pattern
+  names here is enough to surface both". That is FALSE.
 
-  We INCLUDE-filter (rather than run everything and exclude) so the report is
-  exactly the D/E signal and nothing else — no NPE/dead-store/i18n noise drowning
-  the convention findings on first rollout.
+  Verified against findsecbugs-plugin 1.14.0's own findbugs.xml: it defines 144
+  BugPattern types, and NOT ONE of them is an EI_EXPOSE_REP*/MS_* name — the
+  overlap with the D/E list below is exactly zero. FindSecBugs uses its own
+  namespace (SQL_INJECTION, HARD_CODE_KEY, PATH_TRAVERSAL_IN, ...). Because this
+  is an INCLUDE filter, naming only the 9 D/E patterns suppressed all 144
+  security patterns: FindSecBugs was on the classpath and running, but none of its
+  findings could ever be reported. Security scanning had effectively never run.
 
-  ROLLOUT: SpotBugs now runs in FAIL MODE via snapdragon-parent
-  (spotbugs-maven-plugin spotbugs:check, failOnViolation=true; failOnError=false
-  is kept separately so a SpotBugs *internal* error, e.g. a missing class,
-  never fails the build spuriously — that is independent of violation
-  fail-mode). The known-pattern baseline lives in spotbugs-exclude.xml.
+  The 137 FindSecBugs patterns admitted below are the ones measured at ZERO
+  findings across the whole fleet (effort=Max, threshold=Low, real exclude
+  baseline applied, 1311 classes, 0 missing classes / 0 analysis errors), so
+  admitting them costs no new build failures today while making the gate catch
+  these categories on all FUTURE code.
+
+  DELIBERATELY NOT ADMITTED — the 7 patterns that currently fire. Admitting any
+  of them would red-line the fleet immediately (snapdragon-parent runs
+  spotbugs:check with failOnError=true). Each needs its own triage/campaign:
+    SPRING_ENDPOINT (411)      informational "this is an endpoint"; noise in a
+                               fail gate — should never be admitted.
+    CRLF_INJECTION_LOGS (599)  real pattern (log forging), but a fleet-wide
+                               remediation campaign, not a gate flip.
+    IMPROPER_UNICODE (71)      high false-positive rate.
+    REDOS, UNSAFE_HASH_EQUALS, SPRING_CSRF_UNRESTRICTED_REQUEST_MAPPING,
+    COMMAND_INJECTION (9 total) triaged against the real code and found to be
+                               false positives (argv-form ProcessBuilder with no
+                               shell; comparison of PUBLIC SSH host-key
+                               fingerprints; JWT-bearer chains unreachable by an
+                               ambient cookie; bounded {0,61} hostname regexes).
+                               Admit later behind NARROW PER-SITE exclude entries
+                               — never as a blanket pattern suppression.
+
+  ROLLOUT / FAIL MODE: snapdragon-parent runs spotbugs:check with
+  <failOnError>true</failOnError>. On the check goal `failOnError` is the ONLY
+  fail switch and it gates BOTH real findings AND SpotBugs-internal analysis
+  errors together. `failOnViolation` is NOT a parameter of this goal (it belongs
+  to maven-pmd-plugin / maven-checkstyle-plugin); passing it is silently ignored
+  apart from a "[WARNING] Parameter 'failOnViolation' is unknown" line — which is
+  exactly how this gate sat fail-OPEN until snapdragon-parent PR #15. Do not
+  re-add it. The known-pattern baseline lives in spotbugs-exclude.xml.
+
+  Note that spotbugs-exclude.xml's *Test / *Tests / *IT / generated-sources
+  matches carry no <Bug> element, so they are unscoped and drop ALL patterns —
+  including the 144 FindSecBugs ones — in those classes. That is intended, but it
+  makes that file load-bearing for the security coverage admitted here.
 -->
 <FindBugsFilter>
+
+  <!-- ===================== D/E conventions (SpotBugs core) ================= -->
 
   <!-- D. Representation exposure on instance state. -->
   <Match>
@@ -71,4 +103,158 @@
     <Bug pattern="MS_CANNOT_BE_FINAL"/>
   </Match>
 
+  <!-- ================ FindSecBugs 1.14.0 — 137 zero-finding ================ -->
+
+  <!-- Injection: SQL / LDAP / XPath / expression-language / template / OS-command. -->
+  <Match><Bug pattern="AWS_QUERY_INJECTION"/></Match>
+  <Match><Bug pattern="BEAN_PROPERTY_INJECTION"/></Match>
+  <Match><Bug pattern="CUSTOM_INJECTION"/></Match>
+  <Match><Bug pattern="EL_INJECTION"/></Match>
+  <Match><Bug pattern="EXTERNAL_CONFIG_CONTROL"/></Match>
+  <Match><Bug pattern="FORMAT_STRING_MANIPULATION"/></Match>
+  <Match><Bug pattern="GROOVY_SHELL"/></Match>
+  <Match><Bug pattern="HTTP_PARAMETER_POLLUTION"/></Match>
+  <Match><Bug pattern="HTTP_RESPONSE_SPLITTING"/></Match>
+  <Match><Bug pattern="LDAP_INJECTION"/></Match>
+  <Match><Bug pattern="OGNL_INJECTION"/></Match>
+  <Match><Bug pattern="POTENTIAL_XML_INJECTION"/></Match>
+  <Match><Bug pattern="SCALA_COMMAND_INJECTION"/></Match>
+  <Match><Bug pattern="SCALA_SQL_INJECTION_ANORM"/></Match>
+  <Match><Bug pattern="SCALA_SQL_INJECTION_SLICK"/></Match>
+  <Match><Bug pattern="SCRIPT_ENGINE_INJECTION"/></Match>
+  <Match><Bug pattern="SEAM_LOG_INJECTION"/></Match>
+  <Match><Bug pattern="SMTP_HEADER_INJECTION"/></Match>
+  <Match><Bug pattern="SPEL_INJECTION"/></Match>
+  <Match><Bug pattern="SQL_INJECTION"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_ANDROID"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_HIBERNATE"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_JDBC"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_JDO"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_JPA"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_SPRING_JDBC"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_TURBINE"/></Match>
+  <Match><Bug pattern="SQL_INJECTION_VERTX"/></Match>
+  <Match><Bug pattern="TEMPLATE_INJECTION_FREEMARKER"/></Match>
+  <Match><Bug pattern="TEMPLATE_INJECTION_PEBBLE"/></Match>
+  <Match><Bug pattern="TEMPLATE_INJECTION_VELOCITY"/></Match>
+  <Match><Bug pattern="TRUST_BOUNDARY_VIOLATION"/></Match>
+  <Match><Bug pattern="XPATH_INJECTION"/></Match>
+
+  <!-- Path traversal and file disclosure / permissions. -->
+  <Match><Bug pattern="FILE_UPLOAD_FILENAME"/></Match>
+  <Match><Bug pattern="OVERLY_PERMISSIVE_FILE_PERMISSION"/></Match>
+  <Match><Bug pattern="PATH_TRAVERSAL_IN"/></Match>
+  <Match><Bug pattern="PATH_TRAVERSAL_OUT"/></Match>
+  <Match><Bug pattern="REQUESTDISPATCHER_FILE_DISCLOSURE"/></Match>
+  <Match><Bug pattern="SCALA_PATH_TRAVERSAL_IN"/></Match>
+  <Match><Bug pattern="SPRING_FILE_DISCLOSURE"/></Match>
+  <Match><Bug pattern="STRUTS_FILE_DISCLOSURE"/></Match>
+  <Match><Bug pattern="WEAK_FILENAMEUTILS"/></Match>
+
+  <!-- Cryptography: weak ciphers/modes/padding, hard-coded key material, weak digests, weak randomness, TLS trust. -->
+  <Match><Bug pattern="BAD_HEXA_CONVERSION"/></Match>
+  <Match><Bug pattern="BLOWFISH_KEY_SIZE"/></Match>
+  <Match><Bug pattern="CIPHER_INTEGRITY"/></Match>
+  <Match><Bug pattern="CUSTOM_MESSAGE_DIGEST"/></Match>
+  <Match><Bug pattern="DEFAULT_HTTP_CLIENT"/></Match>
+  <Match><Bug pattern="DES_USAGE"/></Match>
+  <Match><Bug pattern="ECB_MODE"/></Match>
+  <Match><Bug pattern="ESAPI_ENCRYPTOR"/></Match>
+  <Match><Bug pattern="HARD_CODE_KEY"/></Match>
+  <Match><Bug pattern="HARD_CODE_PASSWORD"/></Match>
+  <Match><Bug pattern="HAZELCAST_SYMMETRIC_ENCRYPTION"/></Match>
+  <Match><Bug pattern="INSECURE_SMTP_SSL"/></Match>
+  <Match><Bug pattern="NULL_CIPHER"/></Match>
+  <Match><Bug pattern="PADDING_ORACLE"/></Match>
+  <Match><Bug pattern="PREDICTABLE_RANDOM"/></Match>
+  <Match><Bug pattern="PREDICTABLE_RANDOM_SCALA"/></Match>
+  <Match><Bug pattern="RSA_KEY_SIZE"/></Match>
+  <Match><Bug pattern="RSA_NO_PADDING"/></Match>
+  <Match><Bug pattern="SSL_CONTEXT"/></Match>
+  <Match><Bug pattern="STATIC_IV"/></Match>
+  <Match><Bug pattern="TDES_USAGE"/></Match>
+  <Match><Bug pattern="UNENCRYPTED_SERVER_SOCKET"/></Match>
+  <Match><Bug pattern="UNENCRYPTED_SOCKET"/></Match>
+  <Match><Bug pattern="WEAK_HOSTNAME_VERIFIER"/></Match>
+  <Match><Bug pattern="WEAK_MESSAGE_DIGEST_MD5"/></Match>
+  <Match><Bug pattern="WEAK_MESSAGE_DIGEST_SHA1"/></Match>
+  <Match><Bug pattern="WEAK_TRUST_MANAGER"/></Match>
+
+  <!-- Unsafe deserialization and XML external entities / XSLT. -->
+  <Match><Bug pattern="DESERIALIZATION_GADGET"/></Match>
+  <Match><Bug pattern="JACKSON_UNSAFE_DESERIALIZATION"/></Match>
+  <Match><Bug pattern="JSP_XSLT"/></Match>
+  <Match><Bug pattern="LDAP_ENTRY_POISONING"/></Match>
+  <Match><Bug pattern="MALICIOUS_XSLT"/></Match>
+  <Match><Bug pattern="OBJECT_DESERIALIZATION"/></Match>
+  <Match><Bug pattern="SAML_IGNORE_COMMENTS"/></Match>
+  <Match><Bug pattern="XML_DECODER"/></Match>
+  <Match><Bug pattern="XXE_DOCUMENT"/></Match>
+  <Match><Bug pattern="XXE_DTD_TRANSFORM_FACTORY"/></Match>
+  <Match><Bug pattern="XXE_SAXPARSER"/></Match>
+  <Match><Bug pattern="XXE_SCHEMA_FACTORY"/></Match>
+  <Match><Bug pattern="XXE_VALIDATOR"/></Match>
+  <Match><Bug pattern="XXE_XMLREADER"/></Match>
+  <Match><Bug pattern="XXE_XMLSTREAMREADER"/></Match>
+  <Match><Bug pattern="XXE_XPATH"/></Match>
+  <Match><Bug pattern="XXE_XSLT_TRANSFORM_FACTORY"/></Match>
+
+  <!-- SSRF and unvalidated redirects. -->
+  <Match><Bug pattern="PLAY_UNVALIDATED_REDIRECT"/></Match>
+  <Match><Bug pattern="SCALA_PLAY_SSRF"/></Match>
+  <Match><Bug pattern="SPRING_UNVALIDATED_REDIRECT"/></Match>
+  <Match><Bug pattern="UNVALIDATED_REDIRECT"/></Match>
+  <Match><Bug pattern="URLCONNECTION_SSRF_FD"/></Match>
+
+  <!-- Cookies, sessions, CORS/CSRF config, error/data leakage, XSS. -->
+  <Match><Bug pattern="COOKIE_PERSISTENT"/></Match>
+  <Match><Bug pattern="COOKIE_USAGE"/></Match>
+  <Match><Bug pattern="HTTPONLY_COOKIE"/></Match>
+  <Match><Bug pattern="INFORMATION_EXPOSURE_THROUGH_AN_ERROR_MESSAGE"/></Match>
+  <Match><Bug pattern="INSECURE_COOKIE"/></Match>
+  <Match><Bug pattern="JSP_INCLUDE"/></Match>
+  <Match><Bug pattern="JSP_JSTL_OUT"/></Match>
+  <Match><Bug pattern="JSP_SPRING_EVAL"/></Match>
+  <Match><Bug pattern="PERMISSIVE_CORS"/></Match>
+  <Match><Bug pattern="SCALA_SENSITIVE_DATA_EXPOSURE"/></Match>
+  <Match><Bug pattern="SCALA_XSS_MVC_API"/></Match>
+  <Match><Bug pattern="SCALA_XSS_TWIRL"/></Match>
+  <Match><Bug pattern="SERVLET_CONTENT_TYPE"/></Match>
+  <Match><Bug pattern="SERVLET_HEADER"/></Match>
+  <Match><Bug pattern="SERVLET_HEADER_REFERER"/></Match>
+  <Match><Bug pattern="SERVLET_HEADER_USER_AGENT"/></Match>
+  <Match><Bug pattern="SERVLET_PARAMETER"/></Match>
+  <Match><Bug pattern="SERVLET_QUERY_STRING"/></Match>
+  <Match><Bug pattern="SERVLET_SERVER_NAME"/></Match>
+  <Match><Bug pattern="SERVLET_SESSION_ID"/></Match>
+  <Match><Bug pattern="SPRING_CSRF_PROTECTION_DISABLED"/></Match>
+  <Match><Bug pattern="URL_REWRITING"/></Match>
+  <Match><Bug pattern="WICKET_XSS1"/></Match>
+  <Match><Bug pattern="XSS_JSP_PRINT"/></Match>
+  <Match><Bug pattern="XSS_REQUEST_WRAPPER"/></Match>
+  <Match><Bug pattern="XSS_SERVLET"/></Match>
+
+  <!-- Framework endpoint / tainted-input sources and validation bypasses. -->
+  <Match><Bug pattern="ENTITY_LEAK"/></Match>
+  <Match><Bug pattern="ENTITY_MASS_ASSIGNMENT"/></Match>
+  <Match><Bug pattern="JAXRS_ENDPOINT"/></Match>
+  <Match><Bug pattern="JAXWS_ENDPOINT"/></Match>
+  <Match><Bug pattern="LDAP_ANONYMOUS"/></Match>
+  <Match><Bug pattern="MODIFICATION_AFTER_VALIDATION"/></Match>
+  <Match><Bug pattern="NORMALIZATION_AFTER_VALIDATION"/></Match>
+  <Match><Bug pattern="RPC_ENABLED_EXTENSIONS"/></Match>
+  <Match><Bug pattern="STRUTS1_ENDPOINT"/></Match>
+  <Match><Bug pattern="STRUTS2_ENDPOINT"/></Match>
+  <Match><Bug pattern="STRUTS_FORM_VALIDATION"/></Match>
+  <Match><Bug pattern="TAPESTRY_ENDPOINT"/></Match>
+  <Match><Bug pattern="WICKET_ENDPOINT"/></Match>
+
+  <!-- Android-specific (inert on server-side code, admitted for completeness). -->
+  <Match><Bug pattern="ANDROID_BROADCAST"/></Match>
+  <Match><Bug pattern="ANDROID_EXTERNAL_FILE_ACCESS"/></Match>
+  <Match><Bug pattern="ANDROID_GEOLOCATION"/></Match>
+  <Match><Bug pattern="ANDROID_WEB_VIEW_JAVASCRIPT"/></Match>
+  <Match><Bug pattern="ANDROID_WEB_VIEW_JAVASCRIPT_INTERFACE"/></Match>
+  <Match><Bug pattern="ANDROID_WORLD_WRITABLE"/></Match>
+  <Match><Bug pattern="DANGEROUS_PERMISSION_COMBINATION"/></Match>
 </FindBugsFilter>

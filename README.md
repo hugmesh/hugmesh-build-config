@@ -6,7 +6,7 @@ static-analysis rulesets:
 ```
 groupId:    systems.snapdragon
 artifactId: snapdragon-build-config
-version:    0.3.0
+version:    0.4.0
 packaging:  jar
 ```
 
@@ -17,8 +17,9 @@ It contains no Java — only ruleset XML under
 |------|------|----------------------|
 | `pmd-ruleset.xml`     | PMD       | **A** `FinalFieldCouldBeStatic` (constants → `static final`), **B** `ImmutableField` (write-once fields → `final`) |
 | `checkstyle.xml`      | Checkstyle | **F** `VisibilityModifier` (private fields), **G** `FinalClass` + `HideUtilityClassConstructor` + `MutableException` (final/utility/immutable-exception classes), **H** `LambdaBodyLength` (oversized lambda guardrail) |
-| `spotbugs-include.xml`| SpotBugs + FindSecBugs | **D** `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`/`MS_EXPOSE_REP`/`MS_MUTABLE_*` (defensive copies / no rep exposure), **E** `MS_SHOULD_BE_FINAL` (no mutable static) |
-| `spotbugs-exclude.xml`| SpotBugs | The known-pattern **baseline**: entity/dto/model packages (EI_EXPOSE_REP/EI_EXPOSE_REP2), generated sources, and test classes. Also suppresses EI_EXPOSE_REP2 (but NOT EI_EXPOSE_REP) for Spring-managed component packages (controller/service/client/config/repository/etc.) where constructor-injected beans are not an encapsulation leak. |
+| `spotbugs-include.xml`| SpotBugs core | **D** `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`/`MS_EXPOSE_REP`/`MS_MUTABLE_*` (defensive copies / no rep exposure), **E** `MS_SHOULD_BE_FINAL` (no mutable static) |
+| `spotbugs-include.xml`| FindSecBugs 1.14.0 | 137 of its 144 security patterns (SQL/LDAP/XPath/EL injection, path traversal, weak crypto + hard-coded keys, unsafe deserialization, XXE, SSRF, cookie/CORS/CSRF config, XSS). The other 7 currently fire and are listed, with the reason each is held back, in the file's own header. |
+| `spotbugs-exclude.xml`| SpotBugs | The known-pattern **baseline**: entity/dto/model packages (EI_EXPOSE_REP/EI_EXPOSE_REP2), generated sources, and test classes. Also suppresses EI_EXPOSE_REP2 (but NOT EI_EXPOSE_REP) for Spring-managed components — matched both by component *package* and, since 0.4.0, by *class-name suffix* (`*Service`/`*Controller`/`*Repository`/`*Client`/`*Config`/`*Handler`/`*Filter`/`*Resolver`), because the fleet uses feature packages rather than layer packages. Guarded so a `byte[]`/`char[]` key or token, or a mutable collection/date, still reports even inside those classes. |
 
 ## Status
 
@@ -28,7 +29,7 @@ Verified this pass against the actual current code/config (not prior doc claims)
   the 4 XML files under `src/main/resources/snapdragon/`. There is nothing to
   unit-test here beyond the package build itself.
 - **`mvn -o package` builds cleanly offline** (verified this pass) and produces
-  `target/snapdragon-build-config-0.3.0.jar` containing exactly the 4 resources
+  `target/snapdragon-build-config-0.4.0.jar` containing exactly the 4 resources
   at the bare `snapdragon/<file>.xml` path the plugins expect — the distribution
   mechanism described below is real, not aspirational.
 - **All three analysers (PMD, Checkstyle, SpotBugs) are in fail-mode fleet-wide**,
@@ -39,7 +40,16 @@ Verified this pass against the actual current code/config (not prior doc claims)
   warn-first) — corrected in this pass; see "Rollout" below.
 - `EI_EXPOSE_REP2` suppression for Spring-managed component packages
   (constructor-injection false positive) has shipped since 0.3.0 and is present
-  in `spotbugs-exclude.xml`.
+  in `spotbugs-exclude.xml` — but it matched on *package path* and the fleet uses
+  *feature* packages, so it caught almost nothing it was written to catch
+  (measured: 4 of admin-bff-api's 185 injection findings). 0.4.0 adds the
+  class-name-suffix rule that actually covers the intended case.
+- **FindSecBugs had never reported anything.** `spotbugs-include.xml` is an
+  INCLUDE filter and named only the 9 D/E patterns; FindSecBugs' 144 patterns
+  share none of those names (verified against the plugin's own `findbugs.xml`),
+  so every security finding was filtered out before it could be reported. 0.4.0
+  admits the 137 patterns measured at zero findings fleet-wide, which turns the
+  security gate on for future code at zero cost to current builds.
 - No test suite, no CI badge/status page, no changelog file exist in this repo —
   not a gap, just not applicable to a 4-file resource jar; version history is the
   git log.
@@ -88,7 +98,7 @@ standard. Each item maps to the most precise tool:
 
 - **A** static-final constants → PMD `FinalFieldCouldBeStatic`
 - **B** final write-once fields → PMD `ImmutableField`
-- **D** defensive copies / no rep exposure → SpotBugs + FindSecBugs `EI_EXPOSE_REP*` / `MS_EXPOSE_REP` / `MS_MUTABLE_*`
+- **D** defensive copies / no rep exposure → SpotBugs core `EI_EXPOSE_REP*` / `MS_EXPOSE_REP` / `MS_MUTABLE_*` (these are core patterns only — FindSecBugs does *not* reuse these names; it has its own 144-pattern namespace, admitted separately in `spotbugs-include.xml`)
 - **E** mutable static → SpotBugs `MS_SHOULD_BE_FINAL`
 - **F** field visibility → Checkstyle `VisibilityModifier`
 - **G** final/utility/immutable-exception classes → Checkstyle `FinalClass` + `HideUtilityClassConstructor` + `MutableException`
@@ -101,7 +111,7 @@ lambda or every collection field.
 
 ## Rollout: fail-mode (all three tools)
 
-All three analysers now run in **fail-mode** in `snapdragon-parent`: PMD (`pmd:check`, `failOnViolation=true`, flipped fleet-wide once verified clean), Checkstyle (`checkstyle:check`, `failOnViolation=true`, `severity=error` set here in `checkstyle.xml`), and SpotBugs (`spotbugs:check`, `failOnViolation=true`; `failOnError=false` is kept so a SpotBugs *internal* error, e.g. a missing class, never fails the build spuriously — that is independent of violation fail-mode). A violation of any A/B/D/E/F/G/H convention now fails `mvn verify` fleet-wide. `${snapdragon.analysis.skip}` remains available in `snapdragon-parent` as an escape hatch for fast inner-loop builds.
+All three analysers now run in **fail-mode** in `snapdragon-parent`: PMD (`pmd:check`, `failOnViolation=true`, flipped fleet-wide once verified clean), Checkstyle (`checkstyle:check`, `failOnViolation=true`, `severity=error` set here in `checkstyle.xml`), and SpotBugs (`spotbugs:check`, `failOnError=true` since parent PR #15). On the SpotBugs `check` goal `failOnError` is the *only* fail switch, and it gates real findings and SpotBugs-internal analysis errors together — the two are not separable, and an internal error means the gate never actually ran, so failing is correct. `failOnViolation` is **not** a parameter of that goal (it belongs to maven-pmd-plugin / maven-checkstyle-plugin); it was silently ignored, which is why the SpotBugs gate actually sat fail-**open** from `7d22f1a` until parent PR #15. Do not re-add it. A violation of any A/B/D/E/F/G/H convention now fails `mvn verify` fleet-wide. `${snapdragon.analysis.skip}` remains available in `snapdragon-parent` as an escape hatch for fast inner-loop builds.
 
 ## Building / testing locally
 

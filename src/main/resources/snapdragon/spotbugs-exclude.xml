@@ -12,6 +12,28 @@
   <excludeFilterFile>snapdragon/spotbugs-exclude.xml</excludeFilterFile>
   (resolved from the plugin classpath, since snapdragon-build-config is a plugin
   <dependency>).
+
+  ============================================================================
+  MAINTAINER NOTE — <Field type="..."> DOES NOT SUPPORT REGEX. VERIFIED.
+  ============================================================================
+  <Class name="~regex"/> and <Package name="~regex"/> DO support the leading-~
+  Java-regex form, and the regex must match the WHOLE name (NameMatch uses
+  Matcher.matches(), not find()).
+
+  <Field type="..."/> does NOT. FieldMatcher passes the attribute through
+  SignatureUtil.createFieldSignature(), which converts a *source-level type name*
+  ("byte[]" -> "[B", "java.util.List" -> "Ljava/util/List;"). A "~..." regex is
+  mangled by that conversion into a signature that can never match — and it fails
+  SILENTLY: no parse error, no warning, the element simply never matches.
+
+  That silence is dangerous *specifically inside <Not>*: a <Not> wrapping a
+  never-matching <Field> is always true, so the guard evaporates and the enclosing
+  <Match> degrades into a BLANKET suppression of the whole bug pattern.
+  This was verified empirically against spotbugs 4.9.8 on snapdragon-user-bff-api:
+    <Not><Field type="byte[]"/></Not>   -> 3 byte[] findings correctly SURVIVED
+    <Not><Field type="~.*\[\]"/></Not>  -> guard evaporated, ALL findings suppressed
+  So: list exact type names below, one <Field> per type. NEVER use "~" in a
+  <Field type>. If you need a new type guarded, add an exact entry.
 -->
 <FindBugsFilter>
 
@@ -52,10 +74,58 @@
        mutated post-construction — this is NOT an encapsulation leak.
        Suppress EI_EXPOSE_REP2 (storing externally mutable object) for the
        standard Spring component packages only; EI_EXPOSE_REP (returning
-       mutable objects) remains active for real finding coverage. -->
+       mutable objects) remains active for real finding coverage.
+
+       NOTE: this PACKAGE-shaped rule is kept because it does still fire for the
+       few classes that genuinely live under a layer package (measured: 4
+       findings in snapdragon-admin-bff-api, via its `config`/`internalapi`
+       packages; 0 elsewhere). It is NOT sufficient on its own — see the
+       class-name rule below for why. -->
   <Match>
     <Package name="~.*\.(controller|service|client|config|repository|external|filter|handler|resolver|web|internalapi)(\..*)?"/>
     <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+
+  <!-- Same Spring constructor-injection false positive, matched by CLASS-NAME
+       SUFFIX instead of package path.
+
+       WHY: the rule above assumes LAYER packages (…​.service.FooService), but the
+       fleet is organised in FEATURE packages — e.g.
+         systems.snapdragon.adminbff.announcement.AnnouncementService
+       is a service whose package is `announcement`, not `…​.service`. The package
+       rule therefore misses almost every Spring component we actually have
+       (measured: it catches 4 of the 185 injection findings in admin-bff-api).
+       Matching the class-name suffix is what the original rule intended to cover.
+
+       SCOPE: deliberately limited to the same stereotypes the package rule
+       already named (Service/Controller/Repository/Client/Config/Handler/
+       Filter/Resolver). Not broadened to app-specific bean suffixes
+       (Reconciler/Orchestrator/Effector/…) — those stay reported and get triaged
+       on their merits rather than silently muted.
+
+       GUARD: only the injected-collaborator FP is suppressed. If the stored field
+       is a mutable DATA carrier — a byte[]/char[] key or token, or a mutable
+       collection/date — the finding is REAL and must survive even inside a
+       *Service. Those types are listed exactly (see MAINTAINER NOTE above: regex
+       is not available here, and a broken guard degrades to blanket suppression).
+       Verified: this rule suppresses 0 array-typed and 0 collection-typed
+       findings across the fleet. -->
+  <Match>
+    <Class name="~.*(Service|Controller|Repository|Client|Config|Handler|Filter|Resolver)"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+    <Not>
+      <Or>
+        <!-- Secret-shaped: caller-supplied key / token / password material. -->
+        <Field type="byte[]"/>
+        <Field type="char[]"/>
+        <!-- Mutable data carriers stored by reference. -->
+        <Field type="java.util.List"/>
+        <Field type="java.util.Map"/>
+        <Field type="java.util.Set"/>
+        <Field type="java.util.Collection"/>
+        <Field type="java.util.Date"/>
+      </Or>
+    </Not>
   </Match>
 
 </FindBugsFilter>
