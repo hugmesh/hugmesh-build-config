@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Snapdragon shared SpotBugs INCLUDE filter.
+  HugMesh shared SpotBugs INCLUDE filter.
 
   CURATED, not kitchen-sink. SpotBugs ships hundreds of bug patterns; an INCLUDE
   filter means ONLY the patterns named here are ever reported — anything not
@@ -36,7 +36,7 @@
   these categories on all FUTURE code.
 
   DELIBERATELY NOT ADMITTED — the 7 patterns that currently fire. Admitting any
-  of them would red-line the fleet immediately (snapdragon-parent runs
+  of them would red-line the fleet immediately (hugmesh-parent runs
   spotbugs:check with failOnError=true). Each needs its own triage/campaign:
     SPRING_ENDPOINT (411)      informational "this is an endpoint"; noise in a
                                fail gate — should never be admitted.
@@ -52,13 +52,13 @@
                                Admit later behind NARROW PER-SITE exclude entries
                                — never as a blanket pattern suppression.
 
-  ROLLOUT / FAIL MODE: snapdragon-parent runs spotbugs:check with
+  ROLLOUT / FAIL MODE: hugmesh-parent runs spotbugs:check with
   <failOnError>true</failOnError>. On the check goal `failOnError` is the ONLY
   fail switch and it gates BOTH real findings AND SpotBugs-internal analysis
   errors together. `failOnViolation` is NOT a parameter of this goal (it belongs
   to maven-pmd-plugin / maven-checkstyle-plugin); passing it is silently ignored
   apart from a "[WARNING] Parameter 'failOnViolation' is unknown" line — which is
-  exactly how this gate sat fail-OPEN until snapdragon-parent PR #15. Do not
+  exactly how this gate sat fail-OPEN until hugmesh-parent PR #15. Do not
   re-add it. The known-pattern baseline lives in spotbugs-exclude.xml.
 
   Note that spotbugs-exclude.xml's *Test / *Tests / *IT / generated-sources

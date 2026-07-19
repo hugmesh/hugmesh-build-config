@@ -1,17 +1,17 @@
-# snapdragon-build-config
+# hugmesh-build-config
 
-A tiny, **resource-only JAR** that carries the Snapdragon ecosystem's shared
+A tiny, **resource-only JAR** that carries the HugMesh ecosystem's shared
 static-analysis rulesets:
 
 ```
-groupId:    systems.snapdragon
-artifactId: snapdragon-build-config
-version:    0.4.0
+groupId:    systems.hugmesh
+artifactId: hugmesh-build-config
+version:    0.5.0
 packaging:  jar
 ```
 
 It contains no Java — only ruleset XML under
-`src/main/resources/snapdragon/`:
+`src/main/resources/hugmesh/`:
 
 | File | Tool | Conventions enforced |
 |------|------|----------------------|
@@ -26,14 +26,14 @@ It contains no Java — only ruleset XML under
 Verified this pass against the actual current code/config (not prior doc claims):
 
 - **Resource-only jar, no Java, no `src/test`** — `find src -type f` turns up only
-  the 4 XML files under `src/main/resources/snapdragon/`. There is nothing to
+  the 4 XML files under `src/main/resources/hugmesh/`. There is nothing to
   unit-test here beyond the package build itself.
 - **`mvn -o package` builds cleanly offline** (verified this pass) and produces
-  `target/snapdragon-build-config-0.4.0.jar` containing exactly the 4 resources
-  at the bare `snapdragon/<file>.xml` path the plugins expect — the distribution
+  `target/hugmesh-build-config-0.5.0.jar` containing exactly the 4 resources
+  at the bare `hugmesh/<file>.xml` path the plugins expect — the distribution
   mechanism described below is real, not aspirational.
 - **All three analysers (PMD, Checkstyle, SpotBugs) are in fail-mode fleet-wide**,
-  confirmed by reading `snapdragon-parent`'s current `pom.xml` directly: PMD
+  confirmed by reading `hugmesh-parent`'s current `pom.xml` directly: PMD
   flipped to `pmd:check`/`failOnViolation=true` in parent commit `2363e60`,
   Checkstyle in `ef31599`, SpotBugs in `7d22f1a` (all merged 2026-06-23/24). This
   repo's own docs had drifted behind that (still said PMD/SpotBugs were
@@ -57,15 +57,15 @@ Verified this pass against the actual current code/config (not prior doc claims)
 ## Why a separate artifact (the distribution mechanism)
 
 Static-analysis plugins resolve a ruleset from **their own plugin
-classpath**, not the project's compile classpath. So `snapdragon-parent` adds
+classpath**, not the project's compile classpath. So `hugmesh-parent` adds
 this jar to each analysis plugin's `<dependencies>` and points the plugin at
-the bare classpath path `snapdragon/<file>.xml` (no `classpath:` prefix — that
+the bare classpath path `hugmesh/<file>.xml` (no `classpath:` prefix — that
 prefix causes `maven-pmd-plugin`/`spotbugs-maven-plugin` to fail with
 "Could not find resource"). Because the parent inherits into every Java
 repo, every repo gets the same audited rulesets automatically — **no per-repo XML
 copy**.
 
-This is kept **separate from `snapdragon-commons`** (the runtime security library)
+This is kept **separate from `hugmesh-commons`** (the runtime security library)
 on purpose: a ruleset tweak must not force a version bump of a runtime artifact,
 and build-config must not drag Spring onto any plugin classpath. It is the standard
 enterprise "shared build config artifact" pattern (cf. how `google-checks`/
@@ -74,9 +74,9 @@ enterprise "shared build config artifact" pattern (cf. how `google-checks`/
 ```mermaid
 flowchart LR
     XML["4 ruleset XML files\n(pmd-ruleset.xml, checkstyle.xml,\nspotbugs-include.xml, spotbugs-exclude.xml)"]
-    JAR["snapdragon-build-config jar\n(resource-only)"]
+    JAR["hugmesh-build-config jar\n(resource-only)"]
     REG[("GitLab Maven\nPackage Registry")]
-    PARENT["snapdragon-parent pom.xml\nPMD / Checkstyle / SpotBugs\nplugin wiring"]
+    PARENT["hugmesh-parent pom.xml\nPMD / Checkstyle / SpotBugs\nplugin wiring"]
     REPO["Each Java repo's own\nmvn verify"]
     GATE{"Any convention\nviolation?"}
     FAIL["Build fails\n(fail-mode)"]
@@ -84,7 +84,7 @@ flowchart LR
 
     XML --> JAR
     JAR -->|"mvn deploy -s settings.xml\n(GitLab CI, default branch / tag)"| REG
-    REG -->|"plugin classpath dependency\n(bare path snapdragon/*.xml)"| PARENT
+    REG -->|"plugin classpath dependency\n(bare path hugmesh/*.xml)"| PARENT
     PARENT -->|"inherited by every child repo"| REPO
     REPO --> GATE
     GATE -->|yes| FAIL
@@ -111,7 +111,7 @@ lambda or every collection field.
 
 ## Rollout: fail-mode (all three tools)
 
-All three analysers now run in **fail-mode** in `snapdragon-parent`: PMD (`pmd:check`, `failOnViolation=true`, flipped fleet-wide once verified clean), Checkstyle (`checkstyle:check`, `failOnViolation=true`, `severity=error` set here in `checkstyle.xml`), and SpotBugs (`spotbugs:check`, `failOnError=true` since parent PR #15). On the SpotBugs `check` goal `failOnError` is the *only* fail switch, and it gates real findings and SpotBugs-internal analysis errors together — the two are not separable, and an internal error means the gate never actually ran, so failing is correct. `failOnViolation` is **not** a parameter of that goal (it belongs to maven-pmd-plugin / maven-checkstyle-plugin); it was silently ignored, which is why the SpotBugs gate actually sat fail-**open** from `7d22f1a` until parent PR #15. Do not re-add it. A violation of any A/B/D/E/F/G/H convention now fails `mvn verify` fleet-wide. `${snapdragon.analysis.skip}` remains available in `snapdragon-parent` as an escape hatch for fast inner-loop builds.
+All three analysers now run in **fail-mode** in `hugmesh-parent`: PMD (`pmd:check`, `failOnViolation=true`, flipped fleet-wide once verified clean), Checkstyle (`checkstyle:check`, `failOnViolation=true`, `severity=error` set here in `checkstyle.xml`), and SpotBugs (`spotbugs:check`, `failOnError=true` since parent PR #15). On the SpotBugs `check` goal `failOnError` is the *only* fail switch, and it gates real findings and SpotBugs-internal analysis errors together — the two are not separable, and an internal error means the gate never actually ran, so failing is correct. `failOnViolation` is **not** a parameter of that goal (it belongs to maven-pmd-plugin / maven-checkstyle-plugin); it was silently ignored, which is why the SpotBugs gate actually sat fail-**open** from `7d22f1a` until parent PR #15. Do not re-add it. A violation of any A/B/D/E/F/G/H convention now fails `mvn verify` fleet-wide. `${hugmesh.analysis.skip}` remains available in `hugmesh-parent` as an escape hatch for fast inner-loop builds.
 
 ## Building / testing locally
 
@@ -122,9 +122,9 @@ building the jar and re-running a consuming repo's analysis against it:
 # 1. Build + install this jar into ~/.m2 so sibling repos resolve it offline.
 mvn install
 
-# 2. In a consuming repo (any Java repo that inherits snapdragon-parent),
+# 2. In a consuming repo (any Java repo that inherits hugmesh-parent),
 #    re-run analysis to pick up the locally-installed jar:
-mvn verify -Dsnapdragon-build-config.version=<version you just installed>
+mvn verify -Dhugmesh-build-config.version=<version you just installed>
 ```
 
 `mvn -o package` (offline, no network) is enough to sanity-check the jar itself
@@ -143,15 +143,15 @@ Actions pipeline; CI is GitLab. For local dev, `mvn install` writes the jar to
 ## Known Gaps / TODO
 
 - None open against this repo's own backlog (checked `platform-todo-queue` and
-  other session-memory notes for `build-config` / `snapdragon-build-config` /
+  other session-memory notes for `build-config` / `hugmesh-build-config` /
   ruleset-related entries — no matches).
 - **Fixed this pass:** the "Rollout" section and the `ROLLOUT:` header comments
   in `pmd-ruleset.xml`, `checkstyle.xml` and `spotbugs-include.xml` all still
-  claimed PMD and SpotBugs ran warn-first. Reading `snapdragon-parent`'s current
+  claimed PMD and SpotBugs ran warn-first. Reading `hugmesh-parent`'s current
   `pom.xml` directly showed all three analysers were already flipped to
   fail-mode (parent commits `2363e60`, `ef31599`, `7d22f1a`, 2026-06-23/24) —
   before even this repo's own most recent "docs sync" commits, which missed the
   drift. Corrected everywhere in this pass.
 - A prior pass fixed a stale `pom.xml` comment above `<build>` that said plugins
-  resolve `classpath:/snapdragon/<file>.xml`, contradicting the bare-path
+  resolve `classpath:/hugmesh/<file>.xml`, contradicting the bare-path
   wording already correct elsewhere.

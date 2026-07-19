@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Snapdragon shared PMD ruleset (PMD 7.x).
+  HugMesh shared PMD ruleset (PMD 7.x).
 
   CURATED, not kitchen-sink. This ruleset wires ONLY the two secure/clean-Java
   conventions PMD enforces reliably and without noise:
@@ -14,22 +14,22 @@
   NOT pull the whole PMD category in here — that would drown the two signals we
   actually want in hundreds of style opinions.
 
-  ROLLOUT: this ruleset now runs in FAIL MODE via snapdragon-parent
+  ROLLOUT: this ruleset now runs in FAIL MODE via hugmesh-parent
   (maven-pmd-plugin pmd:check, failOnViolation=true) — the fleet was verified
-  clean before the flip. See snapdragon-parent/pom.xml.
+  clean before the flip. See hugmesh-parent/pom.xml.
 
-  Distributed as a classpath resource inside the snapdragon-build-config jar and
-  referenced from the plugin via <rulesets>snapdragon/pmd-ruleset.xml</rulesets>
+  Distributed as a classpath resource inside the hugmesh-build-config jar and
+  referenced from the plugin via <rulesets>hugmesh/pmd-ruleset.xml</rulesets>
   (no "classpath:" prefix — the plugin resolves this bare path from its own
-  classpath once snapdragon-build-config is added as a plugin <dependency>).
+  classpath once hugmesh-build-config is added as a plugin <dependency>).
 -->
-<ruleset name="snapdragon-conventions"
+<ruleset name="hugmesh-conventions"
          xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
 
   <description>
-    Snapdragon secure/clean-Java conventions enforced by PMD: constants should be
+    HugMesh secure/clean-Java conventions enforced by PMD: constants should be
     static (A) and write-once fields should be final (B). Curated to exactly two
     rules to keep the signal high. Fail-mode via the metapom.
   </description>

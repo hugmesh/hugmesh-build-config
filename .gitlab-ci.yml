@@ -1,8 +1,8 @@
-# snapdragon-build-config — build the rulesets jar and publish it to the GitLab
+# hugmesh-build-config — build the rulesets jar and publish it to the GitLab
 # Maven Package Registry.
 #
 # This artifact carries only the shared PMD/Checkstyle/SpotBugs ruleset XMLs that
-# snapdragon-parent references on each analysis plugin's classpath. It compiles no
+# hugmesh-parent references on each analysis plugin's classpath. It compiles no
 # Java; the pipeline just packages the resources and (on the default branch / a tag)
 # deploys the jar so the metapom + every Java repo can resolve it.
 

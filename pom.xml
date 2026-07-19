@@ -4,16 +4,16 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>systems.snapdragon</groupId>
-  <artifactId>snapdragon-build-config</artifactId>
-  <version>0.4.0</version>
+  <groupId>systems.hugmesh</groupId>
+  <artifactId>hugmesh-build-config</artifactId>
+  <version>0.5.0</version>
   <packaging>jar</packaging>
-  <name>snapdragon-build-config</name>
-  <description>Shared static-analysis rulesets for the Snapdragon ecosystem: a tiny
+  <name>hugmesh-build-config</name>
+  <description>Shared static-analysis rulesets for the HugMesh ecosystem: a tiny
     resource-only jar carrying the curated PMD ruleset, Checkstyle config and SpotBugs
     include/exclude filters that enforce the org's secure/clean-Java + reactive-readability
-    conventions. Referenced by snapdragon-parent on each analysis plugin's own classpath
-    (bare path snapdragon/*.xml, no "classpath:" prefix), so every Java repo inherits ONE audited ruleset instead
+    conventions. Referenced by hugmesh-parent on each analysis plugin's own classpath
+    (bare path hugmesh/*.xml, no "classpath:" prefix), so every Java repo inherits ONE audited ruleset instead
     of copying XML per repo. Standalone (no Spring/parent) so a ruleset tweak never forces
     a metapom or runtime-library version bump.</description>
 
@@ -30,9 +30,9 @@
 
   <!--
     No <dependencies>: this artifact ships only XML resources under
-    src/main/resources/snapdragon/. The PMD / Checkstyle / SpotBugs plugins read
-    those resources from THIS jar when snapdragon-parent adds it to each plugin's
-    <dependencies> block (so they resolve the bare path snapdragon/<file>.xml from
+    src/main/resources/hugmesh/. The PMD / Checkstyle / SpotBugs plugins read
+    those resources from THIS jar when hugmesh-parent adds it to each plugin's
+    <dependencies> block (so they resolve the bare path hugmesh/<file>.xml from
     the plugin classloader, independent of the project's own dependencies; a
     "classpath:" prefix causes these plugins to fail with "Could not find
     resource" — see the description above and README.md).
@@ -54,7 +54,7 @@
   </build>
 
   <!-- Publish to the GitLab project's Maven Package Registry — mirrors
-       snapdragon-parent's distributionManagement. CI_API_V4_URL / CI_PROJECT_ID are
+       hugmesh-parent's distributionManagement. CI_API_V4_URL / CI_PROJECT_ID are
        provided by GitLab CI; the CI_JOB_TOKEN credential lives in settings.xml
        (consumed by `mvn deploy -s settings.xml`), never here. NO secret committed. -->
   <distributionManagement>
