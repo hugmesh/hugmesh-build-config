@@ -42,7 +42,7 @@ Verified this pass against the actual current code/config (not prior doc claims)
   (constructor-injection false positive) has shipped since 0.3.0 and is present
   in `spotbugs-exclude.xml` — but it matched on *package path* and the fleet uses
   *feature* packages, so it caught almost nothing it was written to catch
-  (measured: 4 of admin-bff-api's 185 injection findings). 0.4.0 adds the
+  (measured: 4 of hugmesh-admin-bff-api's 185 injection findings). 0.4.0 adds the
   class-name-suffix rule that actually covers the intended case.
 - **FindSecBugs had never reported anything.** `spotbugs-include.xml` is an
   INCLUDE filter and named only the 9 D/E patterns; FindSecBugs' 144 patterns
