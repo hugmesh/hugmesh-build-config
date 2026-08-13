@@ -1,0 +1,40 @@
+# Manually-triggered release workflow for the hugmesh-build-config resource-only
+# jar. Intentionally workflow_dispatch-only (no push/tag trigger) so it stays
+# inert until a human turns it on. Mirrors what .gitlab-ci.yml already does
+# (mvn package, then mvn deploy), retargeted from the GitLab Maven Package
+# Registry to GitHub Packages. Auth uses actions/setup-java's built-in
+# server-id/server-username/server-password mechanism — no hand-rolled
+# settings.xml.
+
+name: Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          server-id: github
+          server-username: GITHUB_ACTOR
+          server-password: GITHUB_TOKEN
+
+      - name: Build the resource-only jar
+        run: mvn -B -ntp package
+
+      - name: Publish to GitHub Packages
+        run: mvn -B -ntp deploy -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/hugmesh-net/hugmesh-build-config
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_ACTOR: ${{ github.actor }}
