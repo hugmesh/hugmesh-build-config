@@ -91,7 +91,7 @@
 
        WHY: the rule above assumes LAYER packages (…​.service.FooService), but the
        fleet is organised in FEATURE packages — e.g.
-         systems.hugmesh.adminbff.announcement.AnnouncementService
+         net.hugmesh.adminbff.announcement.AnnouncementService
        is a service whose package is `announcement`, not `…​.service`. The package
        rule therefore misses almost every Spring component we actually have
        (measured: it catches 4 of the 185 injection findings in admin-bff-api).

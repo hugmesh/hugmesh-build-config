@@ -4,7 +4,7 @@ A tiny, **resource-only JAR** that carries the HugMesh ecosystem's shared
 static-analysis rulesets:
 
 ```
-groupId:    systems.hugmesh
+groupId:    net.hugmesh
 artifactId: hugmesh-build-config
 version:    0.5.0
 packaging:  jar
