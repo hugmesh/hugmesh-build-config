@@ -34,7 +34,7 @@ jobs:
         run: mvn -B -ntp package
 
       - name: Publish to GitHub Packages
-        run: mvn -B -ntp deploy -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/hugmesh-net/hugmesh-build-config
+        run: mvn -B -ntp deploy -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/hugmesh/hugmesh-build-config
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
