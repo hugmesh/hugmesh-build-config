@@ -31,6 +31,27 @@ this workflow passes no `-s`, that generated file is the one Maven reads. (The o
 DO pass `-s`, which *replaces* the user settings file — which is why they each carry a
 `<server><id>github</id>` of their own.)
 
+## This is the only link that needs no cross-repo package grant
+
+Links 2–4 each READ packages published from another repository, and
+`secrets.GITHUB_TOKEN` is scoped to the repository whose workflow is running — so on launch
+day each of those packages must name its consumers under **Manage Actions access**, or the
+builds must carry a `read:packages` PAT in `PACKAGES_READ_TOKEN`. See
+`hugmesh-auth-core/RELEASING.md` §6.1 blocker 4 and §6.2 step 2. Going public does **not**
+perform that grant.
+
+This repo resolves no `net.hugmesh` artifact at all, so none of it applies here — which is
+the same asymmetry as the missing settings file above, and it is worth stating out loud so
+that nobody "aligns" this workflow with its three siblings by adding a `PACKAGES_READ_TOKEN`
+it has no use for. What this repo *is*, in the grant picture, is the **subject**: on launch
+day `hugmesh-build-config`'s own published package is the one that has to grant
+`hugmesh-parent`, `hugmesh-commons` and `hugmesh-auth-core` (route A), because everything
+downstream puts its ruleset jar on an analyser plugin classpath.
+
+Consequence worth knowing before the day: route A grants can only be made **after** a
+package exists, so a cold first publish cannot be fully pre-authorised by clicking. That is
+why route B (`PACKAGES_READ_TOKEN`) is the one recommended for the single-click chain run.
+
 ## Publishing
 
 `workflow_dispatch` only, on `Release`. Never on push or tag: republishing over an
