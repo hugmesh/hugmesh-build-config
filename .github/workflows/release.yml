@@ -5,6 +5,20 @@
 # Registry to GitHub Packages. Auth uses actions/setup-java's built-in
 # server-id/server-username/server-password mechanism — no hand-rolled
 # settings.xml.
+#
+# LINK 1 OF 4, and the only link that needs NO -s settings file. The chain is
+#   hugmesh-build-config 0.5.0 -> hugmesh-parent 2.8.0 -> hugmesh-commons 2.1.0
+#     -> hugmesh-auth-core 2.5.1
+# and this artifact is first precisely because it is the one with no net.hugmesh
+# upstream: pom.xml declares no <parent> and no <dependencies> at all, so Maven
+# Central is a sufficient repository list for it. The other three each ship a
+# .github/maven-ci-settings.xml declaring the GitHub Packages URLs of the links
+# before them; adding one here would be decoration, and decoration in a release
+# path is a thing future readers trust.
+#
+# hugmesh-auth-core/.github/workflows/release-chain.yml fires all four in order
+# from a single trigger. See RELEASING.md here, and hugmesh-auth-core/RELEASING.md
+# sections 3.2 and 6 (operator decision 27, hugmesh-generator#347, 2026-09-17).
 
 name: Release
 
