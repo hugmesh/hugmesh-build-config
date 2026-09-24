@@ -16,7 +16,8 @@ org fails at `verify` until this artifact resolves.**
 The full story — what a release IS in this org, the CI-only resolution route the other three
 links carry, and the operator's launch-day click list — is in
 **`hugmesh-auth-core/RELEASING.md`**. Written 2026-09-17 against operator decision 27
-(hugmesh-generator#347): *"B for the mechanism, A prepared"*.
+(hugmesh-generator#347): *"B for the mechanism, A prepared"*. Decision 27's letters are its
+own: its A is "publish the chain to GitHub Packages", unrelated to the read "route A" below.
 
 ## Why this repo has no `.github/maven-ci-settings.xml`
 
@@ -52,8 +53,9 @@ repo *is*, in the read picture, is the **first thing read**: every downstream li
 ruleset jar on an analyser plugin classpath, so on launch day `hugmesh-parent`,
 `hugmesh-commons` and `hugmesh-auth-core` all read this package with that one secret.
 
-Per-package *Manage Actions access* grants — the "route A" that this file and
-`hugmesh-auth-core/RELEASING.md` §6.2 offered until 2026-09-23 — are **not the plan**.
+Per-package *Manage Actions access* grants — "route A", which this file described before
+2026-09-23 — are **not the plan**. Where another link's `RELEASING.md`, or a `release.yml`
+preflight error message, still offers route A as an option, that text predates decision 90a.
 GitHub's documentation lists that setting only for container, npm, NuGet and RubyGems
 packages and says Maven packages inherit their repository's permissions, so it is probably
 not offered for this package at all. That is read from the docs, not tested — no
