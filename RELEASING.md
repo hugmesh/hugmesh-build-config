@@ -31,26 +31,33 @@ this workflow passes no `-s`, that generated file is the one Maven reads. (The o
 DO pass `-s`, which *replaces* the user settings file — which is why they each carry a
 `<server><id>github</id>` of their own.)
 
-## This is the only link that needs no cross-repo package grant
+## This is the only link that needs no `PACKAGES_READ_TOKEN`
 
 Links 2–4 each READ packages published from another repository, and
-`secrets.GITHUB_TOKEN` is scoped to the repository whose workflow is running — so on launch
-day each of those packages must name its consumers under **Manage Actions access**, or the
-builds must carry a `read:packages` PAT in `PACKAGES_READ_TOKEN`. See
-`hugmesh-auth-core/RELEASING.md` §6.1 blocker 4 and §6.2 step 2. Going public does **not**
-perform that grant.
+`secrets.GITHUB_TOKEN` is scoped to the repository whose workflow is running — so those
+builds read their upstreams with **`PACKAGES_READ_TOKEN`**: one organisation secret holding a
+PAT with `read:packages`, separate from `RELEASE_CHAIN_TOKEN`. Their `release.yml` already
+prefers it and falls back to `GITHUB_TOKEN` only when it is absent. That is **the** route,
+and it is **kept** as a standing secret — not a launch-day stopgap to be retired afterwards
+(operator decision 90a = B, hugmesh-generator#347, answered 2026-09-23). Going public does
+**not** create that secret; the operator does. See `hugmesh-auth-core/RELEASING.md` §6.1
+blocker 4 and §6.2 step 2.
 
 This repo resolves no `net.hugmesh` artifact at all, so none of it applies here — which is
 the same asymmetry as the missing settings file above, and it is worth stating out loud so
 that nobody "aligns" this workflow with its three siblings by adding a `PACKAGES_READ_TOKEN`
-it has no use for. What this repo *is*, in the grant picture, is the **subject**: on launch
-day `hugmesh-build-config`'s own published package is the one that has to grant
-`hugmesh-parent`, `hugmesh-commons` and `hugmesh-auth-core` (route A), because everything
-downstream puts its ruleset jar on an analyser plugin classpath.
+it has no use for. That matters more once the org secret exists, because unless its
+repository access is narrowed it will be *visible* to this repo's workflow too. What this
+repo *is*, in the read picture, is the **first thing read**: every downstream link puts its
+ruleset jar on an analyser plugin classpath, so on launch day `hugmesh-parent`,
+`hugmesh-commons` and `hugmesh-auth-core` all read this package with that one secret.
 
-Consequence worth knowing before the day: route A grants can only be made **after** a
-package exists, so a cold first publish cannot be fully pre-authorised by clicking. That is
-why route B (`PACKAGES_READ_TOKEN`) is the one recommended for the single-click chain run.
+Per-package *Manage Actions access* grants — the "route A" that this file and
+`hugmesh-auth-core/RELEASING.md` §6.2 offered until 2026-09-23 — are **not the plan**.
+GitHub's documentation lists that setting only for container, npm, NuGet and RubyGems
+packages and says Maven packages inherit their repository's permissions, so it is probably
+not offered for this package at all. That is read from the docs, not tested — no
+`net.hugmesh` package is known to have been published (see the last bullet below).
 
 ## Publishing
 
@@ -77,6 +84,9 @@ two different rulesets ship with the same normalized timestamp.
   equivalent pin would have to live in `hugmesh-generator`'s shell suite, outside the file
   set this change was allowed to touch. **Until that exists, the only thing stopping this
   workflow gaining a `push` trigger is review.**
+- **Whether `PACKAGES_READ_TOKEN` exists is not verified from here.** Creating it is
+  operator-owned (decision 90a); listing org secrets needs org-admin and this box cannot
+  confirm it. It does not gate this repo's own publish, only links 2–4.
 - **Whether anything is already published is unknown, not "nothing".** Confirming needs a
   token with `read:packages`; this box's has none
   (`gh api /orgs/hugmesh/packages?package_type=maven` → HTTP 403).
