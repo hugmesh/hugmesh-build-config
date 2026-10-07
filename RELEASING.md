@@ -36,8 +36,11 @@ DO pass `-s`, which *replaces* the user settings file — which is why they each
 
 Links 2–4 each READ packages published from another repository, and
 `secrets.GITHUB_TOKEN` is scoped to the repository whose workflow is running — so those
-builds read their upstreams with **`PACKAGES_READ_TOKEN`**: one organisation secret holding a
-PAT with `read:packages`, separate from `RELEASE_CHAIN_TOKEN`. Their `release.yml` already
+builds read their upstreams with **`PACKAGES_READ_TOKEN`**: one secret holding a
+PAT with `read:packages`, separate from `RELEASE_CHAIN_TOKEN`. While the repos are private on the
+Free plan it is stored as a REPOSITORY secret on `hugmesh-parent`, `hugmesh-commons` and
+`hugmesh-auth-core` (an org secret is understood not to reach private repos on that plan;
+untested; `hugmesh-auth-core/RELEASING.md` §6.2 "Secret scope"). Their `release.yml` already
 prefers it and falls back to `GITHUB_TOKEN` only when it is absent. That is **the** route,
 and it is **kept** as a standing secret — not a launch-day stopgap to be retired afterwards
 (operator decision 90a = B, hugmesh-generator#347, answered 2026-09-23). Going public does
@@ -47,8 +50,8 @@ blocker 4 and §6.2 step 2.
 This repo resolves no `net.hugmesh` artifact at all, so none of it applies here — which is
 the same asymmetry as the missing settings file above, and it is worth stating out loud so
 that nobody "aligns" this workflow with its three siblings by adding a `PACKAGES_READ_TOKEN`
-it has no use for. That matters more once the org secret exists, because unless its
-repository access is narrowed it will be *visible* to this repo's workflow too. What this
+it has no use for. That matters if the secret is ever created at organisation level, because
+unless its repository access is narrowed it will be *visible* to this repo's workflow too. What this
 repo *is*, in the read picture, is the **first thing read**: every downstream link puts its
 ruleset jar on an analyser plugin classpath, so on launch day `hugmesh-parent`,
 `hugmesh-commons` and `hugmesh-auth-core` all read this package with that one secret.
@@ -86,9 +89,11 @@ two different rulesets ship with the same normalized timestamp.
   equivalent pin would have to live in `hugmesh-generator`'s shell suite, outside the file
   set this change was allowed to touch. **Until that exists, the only thing stopping this
   workflow gaining a `push` trigger is review.**
-- **Whether `PACKAGES_READ_TOKEN` exists is not verified from here.** Creating it is
-  operator-owned (decision 90a); listing org secrets needs org-admin and this box cannot
-  confirm it. It does not gate this repo's own publish, only links 2–4.
+- **`PACKAGES_READ_TOKEN` is measured absent (2026-10-07).** `gh api
+  repos/hugmesh/hugmesh-build-config/actions/secrets` and `.../actions/organization-secrets`
+  both answer 200 with `total_count` 0 (earlier text here recorded 403); the org-level listing
+  `/orgs/hugmesh/actions/secrets` still answers 403. Creating it is operator-owned (decision
+  90a). It does not gate this repo's own publish, only links 2–4.
 - **Whether anything is already published is unknown, not "nothing".** Confirming needs a
   token with `read:packages`; this box's has none
   (`gh api /orgs/hugmesh/packages?package_type=maven` → HTTP 403).
