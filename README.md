@@ -1,7 +1,7 @@
 # hugmesh-build-config
 
 A small **resource-only JAR** that carries the shared static-analysis rulesets
-of the HugMesh ecosystem. It holds rules, not code. Rules kept in one place get
+of the HugMesh ecosystem. Rules kept in one place get
 argued about once; rules copied into every repo get argued about in every repo.
 
 ```
@@ -65,7 +65,7 @@ XML copy**.
 This jar stays **separate from `hugmesh-commons`** (the runtime security library)
 on purpose. A ruleset tweak must not force a version bump of a runtime artifact,
 and build-config must not drag Spring onto any plugin classpath. It is the usual
-"shared build config artifact" pattern (compare `google-checks`/`sun_checks`,
+"shared build config artifact" pattern (compare `google_checks.xml`/`sun_checks.xml`,
 which ship inside the checkstyle jar).
 
 ```mermaid
@@ -157,12 +157,12 @@ The repo also keeps a GitLab pipeline, `.gitlab-ci.yml`, that packages the jar
 and, on the default branch or a tag, deploys it with `mvn deploy -s settings.xml`
 to the GitLab Maven Package Registry. It authenticates with the GitLab-injected
 `CI_JOB_TOKEN`. The `distributionManagement` in `pom.xml` still points there; the
-GitHub workflow overrides it on the command line. For local dev, `mvn install`
+GitHub workflow overrides it with `-DaltDeploymentRepository`. For local dev, `mvn install`
 writes the jar to `~/.m2` so sibling repos resolve it offline.
 
 ## Known Gaps / TODO
 
-- No issues are open against this repo.
+- No issues are open in this repo's issue tracker.
 - Stale text: the header of `pmd-ruleset.xml`, the `<description>` in `pom.xml` and
   the comment above its `<build>` all say the plugins read the bare path
   `hugmesh/<file>.xml`. That is true of Checkstyle and SpotBugs. PMD uses
