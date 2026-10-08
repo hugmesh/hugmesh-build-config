@@ -17,7 +17,7 @@ It contains no Java — only ruleset XML under
 |------|------|----------------------|
 | `pmd-ruleset.xml`     | PMD       | **A** `FinalFieldCouldBeStatic` (constants → `static final`), **B** `ImmutableField` (write-once fields → `final`) |
 | `checkstyle.xml`      | Checkstyle | **F** `VisibilityModifier` (private fields), **G** `FinalClass` + `HideUtilityClassConstructor` + `MutableException` (final/utility/immutable-exception classes), **H** `LambdaBodyLength` (oversized lambda guardrail) |
-| `spotbugs-include.xml`| SpotBugs core | **D** `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`/`MS_EXPOSE_REP`/`MS_MUTABLE_*` (defensive copies / no rep exposure), **E** `MS_SHOULD_BE_FINAL` (no mutable static) |
+| `spotbugs-include.xml`| SpotBugs core | **D** `EI_EXPOSE_REP`/`EI_EXPOSE_REP2`/`MS_EXPOSE_REP`/`MS_MUTABLE_*`/`MS_PKGPROTECT` (defensive copies / no rep exposure), **E** `MS_SHOULD_BE_FINAL`/`MS_CANNOT_BE_FINAL` (no mutable static) |
 | `spotbugs-include.xml`| FindSecBugs 1.14.0 | 137 of its 144 security patterns (SQL/LDAP/XPath/EL injection, path traversal, weak crypto + hard-coded keys, unsafe deserialization, XXE, SSRF, cookie/CORS/CSRF config, XSS). The other 7 currently fire and are listed, with the reason each is held back, in the file's own header. |
 | `spotbugs-exclude.xml`| SpotBugs | The known-pattern **baseline**: entity/dto/model packages (EI_EXPOSE_REP/EI_EXPOSE_REP2), generated sources, and test classes. Also suppresses EI_EXPOSE_REP2 (but NOT EI_EXPOSE_REP) for Spring-managed components — matched both by component *package* and, since 0.4.0, by *class-name suffix* (`*Service`/`*Controller`/`*Repository`/`*Client`/`*Config`/`*Handler`/`*Filter`/`*Resolver`), because the fleet uses feature packages rather than layer packages. Guarded so a `byte[]`/`char[]` key or token, or a mutable collection/date, still reports even inside those classes. |
 
@@ -50,18 +50,20 @@ Verified this pass against the actual current code/config (not prior doc claims)
   so every security finding was filtered out before it could be reported. 0.4.0
   admits the 137 patterns measured at zero findings fleet-wide, which turns the
   security gate on for future code at zero cost to current builds.
-- No test suite, no CI badge/status page, no changelog file exist in this repo —
-  not a gap, just not applicable to a 4-file resource jar; version history is the
-  git log.
+- No test suite and no changelog file exist in this repo — not a gap, just not
+  applicable to a 4-file resource jar; version history is the git log. The
+  release workflow (`.github/workflows/release.yml`) is described under
+  "Publishing".
 
 ## Why a separate artifact (the distribution mechanism)
 
 Static-analysis plugins resolve a ruleset from **their own plugin
 classpath**, not the project's compile classpath. So `hugmesh-parent` adds
 this jar to each analysis plugin's `<dependencies>` and points the plugin at
-the bare classpath path `hugmesh/<file>.xml` (no `classpath:` prefix — that
-prefix causes `maven-pmd-plugin`/`spotbugs-maven-plugin` to fail with
-"Could not find resource"). Because the parent inherits into every Java
+a classpath path (no `classpath:` prefix — that prefix causes
+`maven-pmd-plugin`/`spotbugs-maven-plugin` to fail with "Could not find
+resource"): Checkstyle and SpotBugs use the bare `hugmesh/<file>.xml`, PMD uses
+`/hugmesh/pmd-ruleset.xml` with a leading slash. Because the parent inherits into every Java
 repo, every repo gets the same audited rulesets automatically — **no per-repo XML
 copy**.
 
@@ -75,7 +77,7 @@ enterprise "shared build config artifact" pattern (cf. how `google-checks`/
 flowchart LR
     XML["4 ruleset XML files\n(pmd-ruleset.xml, checkstyle.xml,\nspotbugs-include.xml, spotbugs-exclude.xml)"]
     JAR["hugmesh-build-config jar\n(resource-only)"]
-    REG[("GitLab Maven\nPackage Registry")]
+    REG[("GitHub Packages\n(Maven)")]
     PARENT["hugmesh-parent pom.xml\nPMD / Checkstyle / SpotBugs\nplugin wiring"]
     REPO["Each Java repo's own\nmvn verify"]
     GATE{"Any convention\nviolation?"}
@@ -83,8 +85,8 @@ flowchart LR
     PASS["Build succeeds"]
 
     XML --> JAR
-    JAR -->|"mvn deploy -s settings.xml\n(GitLab CI, default branch / tag)"| REG
-    REG -->|"plugin classpath dependency\n(bare path hugmesh/*.xml)"| PARENT
+    JAR -->|"Release workflow\n(manual dispatch)"| REG
+    REG -->|"plugin classpath dependency\n(hugmesh/*.xml)"| PARENT
     PARENT -->|"inherited by every child repo"| REPO
     REPO --> GATE
     GATE -->|yes| FAIL
@@ -98,8 +100,8 @@ standard. Each item maps to the most precise tool:
 
 - **A** static-final constants → PMD `FinalFieldCouldBeStatic`
 - **B** final write-once fields → PMD `ImmutableField`
-- **D** defensive copies / no rep exposure → SpotBugs core `EI_EXPOSE_REP*` / `MS_EXPOSE_REP` / `MS_MUTABLE_*` (these are core patterns only — FindSecBugs does *not* reuse these names; it has its own 144-pattern namespace, admitted separately in `spotbugs-include.xml`)
-- **E** mutable static → SpotBugs `MS_SHOULD_BE_FINAL`
+- **D** defensive copies / no rep exposure → SpotBugs core `EI_EXPOSE_REP*` / `MS_EXPOSE_REP` / `MS_MUTABLE_*` / `MS_PKGPROTECT` (these are core patterns only — FindSecBugs does *not* reuse these names; it has its own 144-pattern namespace, admitted separately in `spotbugs-include.xml`)
+- **E** mutable static → SpotBugs `MS_SHOULD_BE_FINAL` / `MS_CANNOT_BE_FINAL`
 - **F** field visibility → Checkstyle `VisibilityModifier`
 - **G** final/utility/immutable-exception classes → Checkstyle `FinalClass` + `HideUtilityClassConstructor` + `MutableException`
 - **H** reactive readability → Checkstyle `LambdaBodyLength` (size guardrail only)
@@ -134,24 +136,32 @@ required since this artifact has no `<dependencies>` beyond the pinned
 
 ## Publishing
 
-CI packages and (on the default branch / a tag) deploys the jar to the GitLab
-Maven Package Registry via `mvn deploy -s settings.xml`, authenticated with the
-GitLab-injected `CI_JOB_TOKEN` — **no secret committed**. There is no GitHub
-Actions pipeline; CI is GitLab. For local dev, `mvn install` writes the jar to
-`~/.m2` so sibling repos resolve it offline.
+Publishing is the `Release` GitHub Actions workflow
+(`.github/workflows/release.yml`), `workflow_dispatch` only — never on push or
+tag. It runs `mvn package`, then `mvn deploy` to GitHub Packages
+(`https://maven.pkg.github.com/hugmesh/hugmesh-build-config`) with the
+workflow's own `GITHUB_TOKEN` — **no secret committed**. This jar is link 1 of 4
+in the org's publish chain (`hugmesh-build-config` → `hugmesh-parent` →
+`hugmesh-commons` → `hugmesh-auth-core`); see `RELEASING.md` in this repo.
+
+- Bump `<version>` in the same PR as any ruleset change: a ruleset change
+  published at the same coordinate silently changes what the whole fleet is
+  analysed against.
+- Bump `project.build.outputTimestamp` in `pom.xml` to the release date when you
+  bump the version (it makes the jar reproducible).
+
+The repo still carries a GitLab pipeline, `.gitlab-ci.yml`, that packages the jar
+and (on the default branch / a tag) deploys it via `mvn deploy -s settings.xml`
+to the GitLab Maven Package Registry, authenticated with the GitLab-injected
+`CI_JOB_TOKEN`. `pom.xml`'s `distributionManagement` still points there; the
+GitHub workflow overrides it with `-DaltDeploymentRepository`. For local dev,
+`mvn install` writes the jar to `~/.m2` so sibling repos resolve it offline.
 
 ## Known Gaps / TODO
 
-- None open against this repo's own backlog (checked `platform-todo-queue` and
-  other session-memory notes for `build-config` / `hugmesh-build-config` /
-  ruleset-related entries — no matches).
-- **Fixed this pass:** the "Rollout" section and the `ROLLOUT:` header comments
-  in `pmd-ruleset.xml`, `checkstyle.xml` and `spotbugs-include.xml` all still
-  claimed PMD and SpotBugs ran warn-first. Reading `hugmesh-parent`'s current
-  `pom.xml` directly showed all three analysers were already flipped to
-  fail-mode (parent commits `2363e60`, `ef31599`, `7d22f1a`, 2026-06-23/24) —
-  before even this repo's own most recent "docs sync" commits, which missed the
-  drift. Corrected everywhere in this pass.
-- A prior pass fixed a stale `pom.xml` comment above `<build>` that said plugins
-  resolve `classpath:/hugmesh/<file>.xml`, contradicting the bare-path
-  wording already correct elsewhere.
+- No issues are open against this repo.
+- Stale text: the header of `pmd-ruleset.xml`, the `<description>` in `pom.xml`
+  and the comment above its `<build>` say the plugins read the bare path
+  `hugmesh/<file>.xml`. That holds for Checkstyle and SpotBugs; PMD uses
+  `/hugmesh/pmd-ruleset.xml` in `hugmesh-parent`. Fixing the text changes the
+  jar and the pom, so it waits for the next version bump.
