@@ -1,39 +1,117 @@
-# Manually-triggered release workflow for the hugmesh-build-config resource-only
-# jar. Intentionally workflow_dispatch-only (no push/tag trigger) so it stays
-# inert until a human turns it on. Mirrors what .gitlab-ci.yml already does
-# (mvn package, then mvn deploy), retargeted from the GitLab Maven Package
-# Registry to GitHub Packages. Auth uses actions/setup-java's built-in
-# server-id/server-username/server-password mechanism — no hand-rolled
-# settings.xml.
+# Release workflow for the hugmesh-build-config resource-only jar.
 #
-# LINK 1 OF 4, and the only link that needs NO -s settings file. The chain is
-#   hugmesh-build-config 0.5.0 -> hugmesh-parent 2.8.0 -> hugmesh-commons 2.1.0
-#     -> hugmesh-auth-core 2.5.1
+# WHAT PUBLISHES, AND WHEN (the beta scheme, 2026-10-21):
+#   push of a tag v<version>      -> mvn verify, mvn deploy to GitHub Packages,
+#                                    then a GitHub Release (prerelease, never
+#                                    "latest", while the version has a "-").
+#   workflow_dispatch on a v* tag -> the same thing; this is the re-run path.
+#   workflow_dispatch on main     -> mvn verify only. Nothing is deployed.
+#   anything else                 -> the version job refuses and nothing runs.
+# There is deliberately NO push-to-branch trigger and NO pull_request trigger:
+# a Maven coordinate is immutable, so only a person pushing a tag decides that a
+# version is published. The tag must equal <version> in pom.xml (with a leading
+# "v") and must point at a commit that is on main.
+#
+# WHERE IT RUNS: every job uses the same runs-on line. It picks the repository
+# variable RUNS_ON_PUBLISH (a JSON array such as ["self-hosted","Linux","X64"])
+# only for a non-PR event on main or on a v*/studio-v* tag, and hosted
+# ubuntu-latest in every other case, including when the variable is unset.
+# Deleting RUNS_ON_PUBLISH is the off switch that sends publishing back to
+# hosted runners. This line keeps OUR jobs off the local runner for PRs; it is
+# not a security boundary against fork PRs (a fork's PR runs the fork's copy of
+# the workflow file). The runner group settings are that boundary.
+#
+# LINK 1 OF 4, and the only link that needs NO -s settings file of its own and no
+# PACKAGES_READ_TOKEN. The chain is
+#   hugmesh-build-config 0.6.0-beta.1 -> hugmesh-parent 2.9.0-beta.1
+#     -> hugmesh-commons 2.2.0-beta.1 -> hugmesh-auth-core 2.6.0-beta.1
 # and this artifact is first precisely because it is the one with no net.hugmesh
 # upstream: pom.xml declares no <parent> and no <dependencies> at all, so Maven
-# Central is a sufficient repository list for it. The other three each ship a
-# .github/maven-ci-settings.xml declaring the GitHub Packages URLs of the links
-# before them; adding one here would be decoration, and decoration in a release
-# path is a thing future readers trust.
+# Central is a sufficient repository list for it. The deploy credential is the
+# workflow's own GITHUB_TOKEN, written by actions/setup-java into a settings file
+# under runner.temp (not ~/.m2, which on the local runner is the operator's own).
 #
-# hugmesh-auth-core/.github/workflows/release-chain.yml fires all four in order
-# from a single trigger. See RELEASING.md here, and hugmesh-auth-core/RELEASING.md
-# sections 3.2 and 6 (operator decision 27, hugmesh-generator#347, 2026-09-17).
+# hugmesh-auth-core/.github/workflows/release-chain.yml can fire all four links in
+# order; each link now has to be dispatched on its v* tag ref, or it only
+# verifies. See RELEASING.md here, and hugmesh-auth-core/RELEASING.md.
 
 name: Release
 
 on:
-  workflow_dispatch:
+  push:
+    tags: ['v*']
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  version:
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
+    outputs:
+      version: ${{ steps.guard.outputs.version }}
+      kind: ${{ steps.guard.outputs.kind }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Version guard
+        id: guard
+        run: |
+          set -euo pipefail
+          version="$(python3 -c 'import xml.etree.ElementTree as E; v = E.parse("pom.xml").getroot().find("{http://maven.apache.org/POM/4.0.0}version"); print(v.text.strip() if v is not None and v.text else "")')"
+          if [ -z "$version" ]; then
+            echo "::error::pom.xml has no <project><version>."
+            exit 1
+          fi
+          case "$version" in
+            *-SNAPSHOT)
+              echo "::error::pom.xml version $version is a SNAPSHOT; a published coordinate must be a release or a beta."
+              exit 1 ;;
+          esac
+          if ! [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-(beta|rc)\.[0-9]+)?$ ]]; then
+            echo "::error::pom.xml version $version is not MAJOR.MINOR.PATCH or MAJOR.MINOR.PATCH-beta.N."
+            exit 1
+          fi
+          case "$GITHUB_REF" in
+            refs/tags/v*)
+              if [ "${GITHUB_REF_NAME#v}" != "$version" ]; then
+                echo "::error::tag $GITHUB_REF_NAME does not match pom.xml version $version (expected tag v$version)."
+                exit 1
+              fi
+              if ! git merge-base --is-ancestor HEAD origin/main; then
+                echo "::error::tag $GITHUB_REF_NAME points at $(git rev-parse HEAD), which is not on main. Tag a commit on main."
+                exit 1
+              fi
+              kind=release ;;
+            refs/heads/main)
+              kind=main ;;
+            *)
+              echo "::error::Release runs only on main (verify) or on a v<version> tag (publish), not on $GITHUB_REF."
+              exit 1 ;;
+          esac
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "kind=$kind" >> "$GITHUB_OUTPUT"
+          echo "Version $version, run kind: $kind"
+
   publish:
-    runs-on: ubuntu-latest
+    needs: version
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
     permissions:
       contents: read
       packages: write
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up JDK
         uses: actions/setup-java@v4
@@ -43,12 +121,40 @@ jobs:
           server-id: github
           server-username: GITHUB_ACTOR
           server-password: GITHUB_TOKEN
+          settings-path: ${{ runner.temp }}
 
-      - name: Build the resource-only jar
-        run: mvn -B -ntp package
+      - name: Build and verify the resource-only jar
+        run: mvn -B -ntp -s "$RUNNER_TEMP/settings.xml" verify
 
       - name: Publish to GitHub Packages
-        run: mvn -B -ntp deploy -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/hugmesh/hugmesh-build-config
+        if: needs.version.outputs.kind == 'release'
+        run: mvn -B -ntp -s "$RUNNER_TEMP/settings.xml" deploy -DaltDeploymentRepository=github::default::https://maven.pkg.github.com/hugmesh/hugmesh-build-config
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_ACTOR: ${{ github.actor }}
+
+  github-release:
+    needs: [version, publish]
+    if: needs.version.outputs.kind == 'release'
+    runs-on: ${{ fromJSON(github.event_name != 'pull_request' && github.event_name != 'pull_request_target' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/tags/studio-v')) && vars.RUNS_ON_PUBLISH || '"ubuntu-latest"') }}
+    permissions:
+      contents: write
+    steps:
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; leaving it as it is."
+            exit 0
+          fi
+          flags=(--verify-tag)
+          case "$VERSION" in
+            *-*) flags+=(--prerelease --latest=false) ;;
+          esac
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            --title "hugmesh-build-config $VERSION" \
+            --notes "Maven coordinate net.hugmesh:hugmesh-build-config:$VERSION, published to GitHub Packages (https://maven.pkg.github.com/hugmesh/hugmesh-build-config)." \
+            "${flags[@]}"

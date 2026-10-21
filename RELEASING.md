@@ -3,7 +3,7 @@
 `net.hugmesh:hugmesh-build-config` is **link 1 of 4** in the org's Maven publish chain:
 
 ```
-hugmesh-build-config 0.5.0  ->  hugmesh-parent 2.8.0  ->  hugmesh-commons 2.1.0  ->  hugmesh-auth-core 2.5.1
+hugmesh-build-config 0.6.0-beta.1  ->  hugmesh-parent 2.9.0-beta.1  ->  hugmesh-commons 2.2.0-beta.1  ->  hugmesh-auth-core 2.6.0-beta.1
 ```
 
 It is first because it is the only one of the four with **no `net.hugmesh` upstream at
@@ -62,14 +62,45 @@ preflight error message, still offers route A as an option, that text predates d
 GitHub's documentation lists that setting only for container, npm, NuGet and RubyGems
 packages and says Maven packages inherit their repository's permissions, so it is probably
 not offered for this package at all. That is read from the docs, not tested — no
-`net.hugmesh` package is known to have been published (see the last bullet below).
+`net.hugmesh` package has been read back from the registry (see the last bullet below).
 
 ## Publishing
 
-`workflow_dispatch` only, on `Release`. Never on push or tag: republishing over an
-already-published, immutable coordinate is what forced `hugmesh-auth-core`'s 2.4.2 re-pin.
-Bump `<version>` in the same PR as any ruleset change — a ruleset change published at the
-same coordinate silently changes what every repo in the fleet is analysed against.
+A published version is a **tag**: a person pushes an annotated `v<version>` tag on a commit
+on `main`, where `<version>` equals `pom.xml`'s `<version>`. That push runs `Release`, which
+verifies, deploys to GitHub Packages and creates a GitHub Release (a prerelease, never marked
+latest, while the version contains `-`). A manual `workflow_dispatch` on the same tag is the
+re-run path; a manual run on `main` only runs `mvn verify`. There is **no push-to-branch
+trigger**: republishing over an already-published, immutable coordinate is what forced
+`hugmesh-auth-core`'s 2.4.2 re-pin, and a tag is an explicit decision that a merge is not.
+The version guard refuses a tag that does not equal `pom.xml`, a tag on a commit that is not
+on `main`, and any `-SNAPSHOT`. Bump `<version>` in the same PR as any ruleset change — a
+ruleset change published at the same coordinate silently changes what every repo in the
+fleet is analysed against.
+
+Versions follow the org beta scheme, `MAJOR.MINOR.PATCH-beta.N`. `0.5.0` had a green deploy run from
+the old workflow, so the first beta goes on the next minor: **`0.6.0-beta.1`**. Each further
+beta of `0.6.0` raises N.
+
+Runner: every job uses the repository variable `RUNS_ON_PUBLISH` (a JSON array of runner
+labels) for runs on `main` or a `v*` tag, and hosted `ubuntu-latest` otherwise, including
+whenever the variable is unset. The local self-hosted runner is in the org runner group
+`Default`, which refuses public repositories, so once this repo is public a job sent there
+waits forever: either delete `RUNS_ON_PUBLISH` (hosted runners are free for public repos) or
+move the runner to a group that allows this repo's `release.yml`.
+
+To publish `0.6.0-beta.1` once this change is on `main`:
+
+```
+git tag -a v0.6.0-beta.1 -m "hugmesh-build-config 0.6.0-beta.1" origin/main
+git push origin v0.6.0-beta.1
+```
+
+Re-run (only if that run failed after the tag existed):
+
+```
+gh workflow run release.yml --repo hugmesh/hugmesh-build-config --ref v0.6.0-beta.1
+```
 
 `project.build.outputTimestamp` is pinned in `pom.xml`, so the jar is reproducible: the same
 source produces the same hash. **Bump it to the release date when you bump the version**, or
@@ -77,7 +108,9 @@ two different rulesets ship with the same normalized timestamp.
 
 ## What a human must still verify
 
-- **This workflow has never run.** `gh run list --repo hugmesh/hugmesh-build-config` → empty.
+- **The tag-driven workflow has never run.** The old dispatch-only workflow ran once, green,
+  on 2026-10-07 (run 37699404165, `0.5.0`, hosted runner); its deploy step ended in
+  `BUILD SUCCESS`, but nobody has read `0.5.0` back from the registry.
 - **No Actions job in this org starts at all today.** The annotation on the most recent runs
   across the org is *"The job was not started because recent account payments have failed or
   your spending limit needs to be increased."* Private-repo Actions minutes are billed;
@@ -88,7 +121,7 @@ two different rulesets ship with the same normalized timestamp.
   no test framework on its classpath — `pom.xml` has no `<dependencies>` by design — so the
   equivalent pin would have to live in `hugmesh-generator`'s shell suite, outside the file
   set this change was allowed to touch. **Until that exists, the only thing stopping this
-  workflow gaining a `push` trigger is review.**
+  workflow gaining a push-to-branch or pull-request trigger is review.**
 - **`PACKAGES_READ_TOKEN` is measured absent (2026-10-07).** `gh api
   repos/hugmesh/hugmesh-build-config/actions/secrets` and `.../actions/organization-secrets`
   both answer 200 with `total_count` 0 (earlier text here recorded 403); the org-level listing
