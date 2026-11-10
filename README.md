@@ -140,8 +140,9 @@ the 4 resources. It needs no external repository, because this artifact has no
 
 Publishing is the **`Release`** GitHub Actions workflow
 (`.github/workflows/release.yml`). A person publishes a version by pushing an
-annotated tag `v<version>` on a commit on `main`, where `<version>` is exactly the
-`<version>` in `pom.xml` (today `v0.6.0-beta.1`). The workflow then runs
+annotated tag `v<version>`, where `<version>` is exactly the
+`<version>` in `pom.xml`. A beta tag `vX.Y.Z-beta.N` goes on a commit on `main`, a
+stable tag `vX.Y.Z` on a commit on `release/X.Y`. The workflow then runs
 `mvn verify`, `mvn deploy` to GitHub Packages
 (`https://maven.pkg.github.com/hugmesh/hugmesh-build-config`) with the
 workflow's own `GITHUB_TOKEN`, and creates a GitHub Release. While the version
@@ -149,15 +150,19 @@ has a `-` (a beta), that release is a prerelease and is never marked latest.
 
 | Event | What happens |
 |---|---|
-| push of tag `v<version>` | verify, deploy, GitHub Release |
-| manual run (`workflow_dispatch`) on a `v*` tag | the same; this is the re-run path |
-| manual run on `main` | `mvn verify` only, nothing deployed |
-| anything else | refused by the version guard |
+| push of tag `vX.Y.Z-beta.N` (commit on `main`) | verify, deploy, GitHub prerelease, never Latest |
+| push of tag `vX.Y.Z` (commit on `release/X.Y`) | verify, deploy, GitHub Release, Latest only on the newest stable line |
+| push to `release/X.Y` | `mvn verify` only, nothing deployed |
+| manual run (`workflow_dispatch`) on a `v*` tag | the same as the tag push; this is the re-run path |
+| manual run on `main` or `release/X.Y` | `mvn verify` only, nothing deployed |
+| anything else | refused by the version job |
 
-There is no push-to-branch and no pull-request trigger: a Maven coordinate is
-immutable, so only a tag decides that a version is published. The version guard
-refuses a tag that does not match `pom.xml`, a tag on a commit that is not on
-`main`, and any `-SNAPSHOT` version.
+There is no push trigger on `main` and no pull-request trigger: a Maven
+coordinate is immutable, so only a tag decides that a version is published. The
+version job refuses a tag that does not match `pom.xml`, a beta tag off `main`,
+a stable tag off its `release/X.Y`, an `-rc.N` tag, and any `-SNAPSHOT`
+version. `RELEASING.md` ("Release channels") has the rules and the one-command
+org release.
 
 Every job runs on the runner named by the repository variable
 `RUNS_ON_PUBLISH` (a JSON array such as `["self-hosted","Linux","X64"]`) when
