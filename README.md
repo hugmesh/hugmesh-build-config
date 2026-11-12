@@ -7,7 +7,7 @@ argued about once; rules copied into every repo get argued about in every repo.
 ```
 groupId:    net.hugmesh
 artifactId: hugmesh-build-config
-version:    0.6.0-beta.1
+version:    0.7.0-beta.1
 packaging:  jar
 ```
 
